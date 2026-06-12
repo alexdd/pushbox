@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2005 Alex Duesel, http://www.mandarine.tv
+Copyright (c) 2005 Alex Duesel, http://www.tekturcms.de
 HTML5 / JavaScript conversion (c) 2025
 
   Sprite.js  --  direct port of the 2005 Sprite.java.
