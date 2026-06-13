@@ -6,31 +6,44 @@ collection.
 
 **Blog post:** [PushBox: J2ME to HTML5 in 49 Minutes](https://www.tekturcms.de/index.html#2026-06-13-pushbox-j2me-to-html5-in-49-minutes)
 
-## HTML5 port (`web/`)
+This branch is a plain **HTML5 / JavaScript** port — no build step, no dependencies.
 
-On the **`html5-port`** branch, a [Cursor](https://cursor.com) cloud agent ported the game
-to plain HTML5 / JavaScript in about **49 minutes**. The original three Java classes map
-one-to-one to JavaScript modules; program structure and coding style were deliberately
-kept the same as the 2005 source.
+## Run locally
 
-- **Play online:** embedded in the [blog post](https://www.tekturcms.de/index.html#2026-06-13-pushbox-j2me-to-html5-in-49-minutes) above
-- **Run locally:**
+```bash
+python3 -m http.server 8000
+# open http://localhost:8000/index.html
+```
 
-  ```bash
-  cd web
-  python3 -m http.server 8000
-  # open http://localhost:8000/index.html
-  ```
+Embed mode (for iframes): `index.html?embed=1`
 
-- **Checks:** `node web/tools/headless_test.js` (from repo root)
-- **Mapping & details:** see [`web/README.md`](web/README.md)
+## Checks
 
-The original artwork bundle (`a.bin`) is lost; sprites and tiles are rebuilt
-procedurally at load time in `web/js/runtime.js`.
+```bash
+node tools/headless_test.js
+node --check js/*.js
+```
 
-## Original J2ME source (2005)
+## Layout
 
-`PushBox.java`, `PushBoxCanvas.java`, `Sprite.java` at the repository root &mdash; kept
-for reference / portfolio comparison, not built.
+| File | Role |
+| --- | --- |
+| `index.html` | Page shell, keyboard hints, script load order |
+| `js/PushBox.js` | Canvas bootstrap, input, fixed-timestep game loop |
+| `js/PushBoxCanvas.js` | State machine, isometric renderer, 33 levels, win logic |
+| `js/Sprite.js` | Player and crate sprites, movement + pushing |
+| `js/runtime.js` | MIDP `Graphics`/`Image` shim + procedural art (`buildAssets()`) |
+| `js/levels.js` | Embedded level data (33 stages) |
+| `tools/headless_test.js` | Headless smoke test + solver check |
+| `tools/solver.js` | BFS solver driving the real engine |
 
-Alex's current homepage: [www.tekturcms.de](https://www.tekturcms.de/)
+The original artwork bundle (`a.bin`) is lost; sprites and tiles are rebuilt procedurally
+in `js/runtime.js`.
+
+## Play
+
+- Arrow keys (or WASD) move the player.
+- Space / Enter = fire (advance menus / select a stage).
+- Flow: **title → fire → pick a stage → fire → push every crate onto a target tile.**
+
+Alex's homepage: [www.tekturcms.de](https://www.tekturcms.de/)
