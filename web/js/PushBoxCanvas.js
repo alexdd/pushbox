@@ -512,7 +512,7 @@ class PushBoxCanvas {
           this.drawString(g, levelstrg + ".stage", 8, 10, 100);
         }
         if (this.state === PushBoxCanvas.STATE_WIN) {
-          g.drawImage(this.data[(this.tick % 4) + 49], 10, 2, Graphics.TOP | Graphics.LEFT);
+          g.drawImage(this.data[(this.tick % 4) + 49], 8, 4, Graphics.TOP | Graphics.LEFT);
         }
         break;
       }

@@ -242,13 +242,13 @@ function makeWall() {
 }
 
 function makeCrate(onTarget) {
-  // 45x44 — isometric box: magenta sides, cyan (intro) or green (on target) top,
-  // dark-navy X on the top face (original a.bin look).
+  // 45x44 — magenta sides; green top off-target, cyan top when on a goal tile.
   const im = newImage(45, 44), g = im.getContext("2d");
   const cx = 22, topY = 4;
   const sideL = PALETTE.magenta;
   const sideR = PALETTE.magentaD;
-  const top = onTarget ? PALETTE.greenHi : PALETTE.green;
+  const top = onTarget ? PALETTE.cyan : PALETTE.green;
+  const cross = onTarget ? "#0099bb" : "#2a8a2a";
   // left face
   g.beginPath();
   g.moveTo(0, topY + 11); g.lineTo(cx, topY + 22); g.lineTo(cx, 43); g.lineTo(0, 32); g.closePath();
@@ -262,7 +262,7 @@ function makeCrate(onTarget) {
   g.moveTo(cx, topY); g.lineTo(44, topY + 11); g.lineTo(cx, topY + 22); g.lineTo(0, topY + 11); g.closePath();
   g.fillStyle = top; g.fill();
   // X on top (subtle, inset — no outer diamond stroke)
-  g.strokeStyle = "#2a8a2a";
+  g.strokeStyle = cross;
   g.lineWidth = 1;
   g.beginPath();
   g.moveTo(cx, topY + 2); g.lineTo(cx, topY + 20);
@@ -302,13 +302,14 @@ function drawPlayerSprite(g, ox, oy, dir, sub) {
   g.save();
   g.translate(ox, oy);
   g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, 27, 45);
   const bob = sub === 1 ? -1 : (sub === 2 ? 1 : 0);
   const legSwing = sub === 1 ? 2 : (sub === 2 ? -2 : 0);
   const cx = 13;
   const C = AVATAR_COLORS;
 
   g.fillStyle = "rgba(0,0,0,.28)";
-  g.beginPath(); g.ellipse(cx, 43, 9, 3, 0, 0, Math.PI * 2); g.fill();
+  g.fillRect(4, 41 + bob, 19, 3);
 
   g.fillStyle = C.pants;
   roundRect(g, 7, 30 + bob, 13, 6, 2); g.fill();
@@ -317,8 +318,6 @@ function drawPlayerSprite(g, ox, oy, dir, sub) {
 
   g.fillStyle = C.shirt;
   roundRect(g, 7, 21 + bob, 13, 11, 3); g.fill();
-  g.fillStyle = C.shirtDark;
-  roundRect(g, 8, 22 + bob, 11, 2, 1); g.fill();
 
   g.fillStyle = C.shirt;
   if (dir === 1) g.fillRect(18, 22 + bob, 4, 7);
@@ -329,47 +328,36 @@ function drawPlayerSprite(g, ox, oy, dir, sub) {
   }
 
   if (dir === 0) {
-    // Back of head when walking north (away from camera).
     g.fillStyle = C.skin;
-    g.beginPath(); g.ellipse(cx, 18 + bob, 5, 4, 0, 0, Math.PI * 2); g.fill();
+    g.fillRect(10, 18 + bob, 7, 4);
     g.fillStyle = C.hair;
-    roundRect(g, 5, 6 + bob, 17, 15, 7); g.fill();
-    g.fillStyle = "#2a1e14";
-    g.fillRect(12, 7 + bob, 3, 12);
-    g.fillRect(6, 9 + bob, 15, 3);
-    g.fillStyle = C.skin;
-    g.fillRect(6, 19 + bob, 3, 3);
-    g.fillRect(18, 19 + bob, 3, 3);
+    roundRect(g, 5, 8 + bob, 17, 13, 6); g.fill();
   } else if (dir === 2) {
-    g.fillStyle = C.hair;
-    roundRect(g, 5, 7 + bob, 17, 8, 5); g.fill();
     g.fillStyle = C.skin;
-    g.beginPath(); g.ellipse(cx, 16 + bob, 6, 7, 0, 0, Math.PI * 2); g.fill();
+    g.fillRect(9, 13 + bob, 9, 10);
+    g.fillStyle = C.hair;
+    roundRect(g, 5, 8 + bob, 17, 8, 5); g.fill();
     g.fillStyle = C.eye;
-    g.fillRect(10, 14 + bob, 2, 2);
-    g.fillRect(15, 14 + bob, 2, 2);
+    g.fillRect(10, 15 + bob, 2, 2);
+    g.fillRect(15, 15 + bob, 2, 2);
     g.fillStyle = C.mouth;
-    g.fillRect(11, 18 + bob, 5, 2);
+    g.fillRect(11, 19 + bob, 5, 2);
   } else if (dir === 1) {
-    // Facing east — hair covers top and back (left), face on the right.
-    g.fillStyle = C.hair;
-    roundRect(g, 3, 7 + bob, 16, 13, 6); g.fill();
     g.fillStyle = C.skin;
-    g.beginPath(); g.ellipse(16, 17 + bob, 5, 6, 0, 0, Math.PI * 2); g.fill();
+    g.fillRect(13, 14 + bob, 8, 10);
     g.fillStyle = C.hair;
-    roundRect(g, 13, 7 + bob, 9, 7, 4); g.fill();
+    roundRect(g, 3, 8 + bob, 16, 13, 6); g.fill();
+    roundRect(g, 13, 8 + bob, 9, 7, 4); g.fill();
     g.fillStyle = C.eye;
     g.fillRect(17, 15 + bob, 2, 2);
     g.fillStyle = C.mouth;
     g.fillRect(17, 19 + bob, 3, 2);
   } else {
-    // Facing west — mirror of east.
-    g.fillStyle = C.hair;
-    roundRect(g, 8, 7 + bob, 16, 13, 6); g.fill();
     g.fillStyle = C.skin;
-    g.beginPath(); g.ellipse(10, 17 + bob, 5, 6, 0, 0, Math.PI * 2); g.fill();
+    g.fillRect(6, 14 + bob, 8, 10);
     g.fillStyle = C.hair;
-    roundRect(g, 5, 7 + bob, 9, 7, 4); g.fill();
+    roundRect(g, 8, 8 + bob, 16, 13, 6); g.fill();
+    roundRect(g, 5, 8 + bob, 9, 7, 4); g.fill();
     g.fillStyle = C.eye;
     g.fillRect(8, 15 + bob, 2, 2);
     g.fillStyle = C.mouth;
@@ -459,9 +447,9 @@ function drawAvatarBody(g, withMouth, mouthH) {
 }
 
 function makeWinFrame(frame) {
-  const im = newImage(70, 18), g = im.getContext("2d");
+  const im = newImage(84, 22), g = im.getContext("2d");
   const hi = [PALETTE.magenta, "#ff66ff", PALETTE.magenta, "#ff33ff"][frame % 4];
-  drawLogoWord(g, 0, 0, "super", hi, PALETTE.navy);
+  drawLogoWord(g, 1, 2, "super", hi, PALETTE.navy);
   return im;
 }
 
