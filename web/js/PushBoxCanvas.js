@@ -503,9 +503,9 @@ class PushBoxCanvas {
         } else this.flag = false;
         if (this.state === PushBoxCanvas.STATE_LEVEL_SELECT) {
           g.setColor(89, 151, 187);
-          g.fillRect(0, 0, 80, 30);
+          g.fillRect(0, 0, 96, 30);
           g.setColor(0, 48, 101);
-          g.drawRect(0, 0, 79, 30);
+          g.drawRect(0, 0, 95, 30);
           let levelstrg = "" + (this.lev + 1);
           if (this.lev + 1 < 10) levelstrg = "0" + (this.lev + 1);
           this.drawString(g, levelstrg + ".stage", 8, 10, 100);

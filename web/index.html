@@ -14,12 +14,28 @@
     font-family: "Segoe UI", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
+  html.embed, html.embed body {
+    height: auto;
+    overflow: hidden;
+  }
   .wrap {
     min-height: 100%;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     gap: 18px; padding: 24px 12px;
     box-sizing: border-box;
+  }
+  html.embed .wrap {
+    min-height: auto;
+    padding: 12px;
+    gap: 0;
+  }
+  html.embed h1,
+  html.embed .hint {
+    display: none;
+  }
+  html.embed .phone {
+    box-shadow: none;
   }
   h1 { margin: 0; font-size: 20px; letter-spacing: 2px; font-weight: 700; }
   h1 small { display:block; font-size: 11px; letter-spacing: 1px; color:#6f93b0; font-weight:400; margin-top:4px;}
@@ -55,6 +71,13 @@
     border-radius:4px; padding:1px 6px; font-size:11px; color:#cfe3f2;
   }
 </style>
+<script>
+  (function () {
+    if (new URLSearchParams(location.search).get("embed") === "1" || window.self !== window.top) {
+      document.documentElement.classList.add("embed");
+    }
+  })();
+</script>
 </head>
 <body>
   <div class="wrap">
