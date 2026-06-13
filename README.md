@@ -33,5 +33,4 @@ procedurally at load time in `web/js/runtime.js`.
 `PushBox.java`, `PushBoxCanvas.java`, `Sprite.java` at the repository root &mdash; kept
 for reference / portfolio comparison, not built.
 
-The old Java Applet version is still on Alex's homepage:
-http://www.alex-duesel.de/index_alt.html
+Alex's current homepage: [www.tekturcms.de](https://www.tekturcms.de/)
