@@ -160,7 +160,8 @@ class PushBoxCanvas {
         this.tick > this.INTRO_TEXT[this.intro_txt_idx][0].length + this.INTRO_TEXT[this.intro_txt_idx][1].length + 6) {
       if (this.state === PushBoxCanvas.STATE_START || this.state === PushBoxCanvas.STATE_LEVEL_SELECT) {
         this.tick = 0;
-        this.face = false;
+        if (this.state !== PushBoxCanvas.STATE_START)
+          this.face = false;
         this.intro_txt_idx += 1;
         if (this.state !== PushBoxCanvas.STATE_START)
           this.intro_txt_idx %= 2;
@@ -175,6 +176,9 @@ class PushBoxCanvas {
     switch (this.state) {
       case PushBoxCanvas.STATE_START:
         this.tick = 0;
+        this.currentIndex = 1;
+        this.flag = false;
+        this.face = true;
         this.target_cnt = 0;
         this.loadLevel();
         this.INTRO_TEXT = [
@@ -450,16 +454,11 @@ class PushBoxCanvas {
         let offx = 70;
         let offy = 67;
         if (this.state === PushBoxCanvas.STATE_START) {
-          if (this.face) {
-            g.setColor(0, 48, 101);
-            g.drawRect(offx + 29, offy + 0, 69 + 1, 103 + 1);
-            if (this.currentIndex === 0) {
-              g.drawImage(this.alex[0], offx + 30, offy + 1, Graphics.TOP | Graphics.LEFT);
-            } else {
-              g.drawImage(this.alex[3], offx + 30, offy + 1, Graphics.TOP | Graphics.LEFT);
-              g.drawImage(this.alex[this.currentIndex], offx + 40, offy + 0 + 1, Graphics.TOP | Graphics.LEFT);
-            }
-          }
+          g.setColor(0, 48, 101);
+          g.drawRect(offx + 29, offy + 0, 69 + 1, 103 + 1);
+          g.drawImage(this.alex[3], offx + 30, offy + 1, Graphics.TOP | Graphics.LEFT);
+          const mouthIdx = this.currentIndex === 0 ? 0 : this.currentIndex;
+          g.drawImage(this.alex[mouthIdx], offx + 40, offy + 1, Graphics.TOP | Graphics.LEFT);
         }
         offx = 0;
         offy = 88;
@@ -481,7 +480,10 @@ class PushBoxCanvas {
           }
         }
         if (this.tick * 4 % 15 < 7) {
-          if (this.currentIndex !== 0 && !this.flag) {
+          const keepTalking = this.state === PushBoxCanvas.STATE_START ||
+            (this.currentIndex !== 0 && !this.flag);
+          if (keepTalking) {
+            if (this.currentIndex === 0) this.currentIndex = 1;
             this.currentIndex++;
             if (this.currentIndex > 2) this.currentIndex = 1;
           }
@@ -494,7 +496,8 @@ class PushBoxCanvas {
           }
         }
         if (maxi >= text.length - 1 && maxj >= text[maxi].length - 1) {
-          this.currentIndex = 0;
+          if (this.state !== PushBoxCanvas.STATE_START)
+            this.currentIndex = 0;
         } else if (maxj >= text[maxi].length - 1) {
           this.currentIndex = 1;
           this.flag = true;
