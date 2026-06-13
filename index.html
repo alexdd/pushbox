@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>PushBox &mdash; J2ME (2005) ported to HTML5</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23274058'/><rect x='4' y='4' width='8' height='8' fill='%23a37a45'/></svg>" />
+<style>
+  :root { --screen-w: 176px; --screen-h: 208px; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #0b1622;
+    color: #cfe3f2;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  html.embed, html.embed body {
+    height: auto;
+    overflow: hidden;
+  }
+  .wrap {
+    min-height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px; padding: 24px 12px;
+    box-sizing: border-box;
+  }
+  html.embed .wrap {
+    min-height: auto;
+    padding: 12px;
+    gap: 12px;
+  }
+  html.embed h1 {
+    display: none;
+  }
+  html.embed .hint {
+    margin: 0;
+    font-size: 11px;
+  }
+  html.embed .phone {
+    box-shadow: none;
+  }
+  h1 { margin: 0; font-size: 20px; letter-spacing: 2px; font-weight: 700; }
+  h1 small { display:block; font-size: 11px; letter-spacing: 1px; color:#6f93b0; font-weight:400; margin-top:4px;}
+  /* The old phone screen was 176x208. We render at native resolution into the
+     canvas backbuffer and scale it up crisply with CSS (nearest-neighbour). */
+  .phone {
+    background: linear-gradient(160deg,#243a52,#16242f);
+    border-radius: 22px;
+    padding: 26px 22px 60px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.5), inset 0 0 0 2px rgba(255,255,255,.04);
+    position: relative;
+  }
+  .phone::after {
+    content: ""; position: absolute; left: 50%; bottom: 22px;
+    transform: translateX(-50%);
+    width: 46px; height: 14px; border-radius: 10px;
+    background: rgba(255,255,255,.06);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+  }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: calc(var(--screen-w) * 2);
+    height: calc(var(--screen-h) * 2);
+    display: block;
+    background: #000;
+    border-radius: 4px;
+    box-shadow: 0 0 0 3px #0b1622, 0 0 0 5px #2a4767;
+  }
+  .hint { font-size: 12px; color: #7fa0bb; max-width: 420px; text-align: center; line-height: 1.5; }
+  kbd {
+    background:#1d3047; border:1px solid #2f4d6e; border-bottom-width:2px;
+    border-radius:4px; padding:1px 6px; font-size:11px; color:#cfe3f2;
+  }
+</style>
+<script>
+  (function () {
+    if (new URLSearchParams(location.search).get("embed") === "1" || window.self !== window.top) {
+      document.documentElement.classList.add("embed");
+    }
+  })();
+</script>
+</head>
+<body>
+  <div class="wrap">
+    <h1>PUSHBOX
+      <small>J2ME mobile game (2005) &mdash; converted to HTML5 / JavaScript</small>
+    </h1>
+    <div class="phone">
+      <canvas id="screen" width="176" height="208"></canvas>
+    </div>
+    <p class="hint">
+      <kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&rarr;</kbd> <kbd>&darr;</kbd> move &nbsp;&bull;&nbsp;
+      <kbd>Space</kbd> / <kbd>Enter</kbd> = fire/select.<br />
+      Title &rarr; fire &rarr; pick a stage &rarr; fire &rarr; push every crate onto a blue target tile.
+    </p>
+  </div>
+
+  <!-- Load order mirrors the original three .java source files, plus a small
+       runtime shim that emulates the MIDP lcdui Graphics/Image API in <canvas>. -->
+  <script src="js/runtime.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/Sprite.js"></script>
+  <script src="js/PushBoxCanvas.js"></script>
+  <script src="js/PushBox.js"></script>
+</body>
+</html>
