@@ -1,9 +1,14 @@
-// Headless logic test (no browser): stubs the DOM/canvas, loads the ported
-// game classes, then checks:
-//   1. all 33 levels load without error
-//   2. the core mechanic (push a crate onto a target -> target_cnt++ -> WIN)
-//      works, using a tiny synthetic level
-//   3. a real shipped level (index 3) is solvable via the bundled solver
+/*
+ * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
+ * All rights reserved.
+ *
+ * Headless logic test (no browser): stubs the DOM/canvas, loads the ported
+ * game classes, then checks:
+ *   1. all 33 levels load without error
+ *   2. the core mechanic (push a crate onto a target -> target_cnt++ -> WIN)
+ *      works, using a tiny synthetic level
+ *   3. a real shipped level (index 3) is solvable via the bundled solver
+ */
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");

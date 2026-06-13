@@ -1,7 +1,12 @@
-// A breadth-first Sokoban solver that drives the *actual* ported engine, so a
-// solution it returns is guaranteed to trigger PushBoxCanvas.STATE_WIN in the
-// real game.  Used by headless_test.js and to obtain a key sequence for the
-// demo.  solve(lev) -> array of "U"/"D"/"L"/"R" moves (arrow keys) or null.
+/*
+ * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
+ * All rights reserved.
+ *
+ * A breadth-first Sokoban solver that drives the *actual* ported engine, so a
+ * solution it returns is guaranteed to trigger PushBoxCanvas.STATE_WIN in the
+ * real game.  Used by headless_test.js and to obtain a key sequence for the
+ * demo.  solve(lev) -> array of "U"/"D"/"L"/"R" moves (arrow keys) or null.
+ */
 "use strict";
 
 function solve(lev, maxNodes) {

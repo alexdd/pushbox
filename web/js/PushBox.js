@@ -1,10 +1,8 @@
 /*
-The MIT License (MIT)
-
-Copyright (c) 2005 Alex Duesel, http://www.tekturcms.de
-HTML5 / JavaScript conversion (c) 2025
-
-  PushBox.js  --  port of the 2005 PushBox.java MIDlet entry point.
+ * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
+ * All rights reserved.
+ *
+ * PushBox.js  --  port of the 2005 PushBox.java MIDlet entry point.
 
   startApp() created the PushBoxCanvas and started its thread.  In the browser
   there is no MIDlet lifecycle, so this file builds the canvas, wires keyboard

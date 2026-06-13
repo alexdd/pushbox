@@ -1,10 +1,8 @@
 /*
-The MIT License (MIT)
-
-Copyright (c) 2005 Alex Duesel  (original J2ME game)
-Copyright (c) 2025 HTML5 / JavaScript conversion
-
-  runtime.js
+ * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
+ * All rights reserved.
+ *
+ * runtime.js
   ----------
   The original PushBox was a MIDP-1.0 MIDlet.  It rendered through the
   javax.microedition.lcdui.Graphics API and loaded all of its artwork from a
@@ -120,7 +118,7 @@ function newImage(w, h) {
      data[2]       crate sprite               (45x44)
      data[3]       wall block tile            (48x48 isometric cube)
      data[4]       crate-on-target sprite     (45x44)
-     data[5]       player "lion" sprite sheet (162x90, 12 frames)
+     data[5]       player sprite sheet (162x90, 12 frames)
      data[6..41]   font glyphs (see load(): FONT_pics[3..38])
      data[42..45]  "alex" talking avatar frames
      data[46..48]  font glyphs A,B,C  (see load(): FONT_pics[0..2])
@@ -294,55 +292,107 @@ function makePlayerSheet() {
     for (let sub = 0; sub < 3; sub++) {
       const xframe = dir * 3 + sub;
       const col = xframe >> 1, row = xframe & 1;
-      drawLion(g, col * 27, row * 45, dir, sub);
+      drawSmurf(g, col * 27, row * 45, dir, sub);
     }
   }
   return im;
 }
 
-// A small "lion" mascot inside a 27x45 cell, feet near the bottom.
-function drawLion(g, ox, oy, dir, sub) {
+// Blue smurf with white cap inside a 27x45 cell, feet near the bottom.
+function drawSmurf(g, ox, oy, dir, sub) {
   g.save();
   g.translate(ox, oy);
   const bob = sub === 1 ? -1 : (sub === 2 ? 1 : 0);
   const legSwing = sub === 1 ? 2 : (sub === 2 ? -2 : 0);
+  const blue = "#3d7dd4";
+  const blueDark = "#2f66b0";
+  const white = "#f8f8f8";
+
   // shadow
   g.fillStyle = "rgba(0,0,0,.28)";
   g.beginPath(); g.ellipse(13, 43, 9, 3, 0, 0, Math.PI * 2); g.fill();
-  // legs
-  g.fillStyle = "#b5701f";
+
+  // white trousers + feet
+  g.fillStyle = white;
+  roundRect(g, 7, 29 + bob, 13, 7, 3); g.fill();
   g.fillRect(8 - legSwing, 33 + bob, 4, 9);
   g.fillRect(15 + legSwing, 33 + bob, 4, 9);
+
   // body
-  g.fillStyle = "#e09a3c";
-  roundRect(g, 6, 20 + bob, 15, 16, 5); g.fill();
-  // tail
-  g.strokeStyle = "#b5701f"; g.lineWidth = 2;
-  g.beginPath(); g.moveTo(20, 28 + bob); g.quadraticCurveTo(25, 26 + bob, 24, 20 + bob); g.stroke();
-  // head + mane
-  g.fillStyle = "#c97f24";
-  g.beginPath(); g.ellipse(13, 13 + bob, 11, 10, 0, 0, Math.PI * 2); g.fill(); // mane
-  g.fillStyle = "#f0b259";
-  g.beginPath(); g.ellipse(13, 13 + bob, 7, 7, 0, 0, Math.PI * 2); g.fill();   // face
-  // ears
-  g.fillStyle = "#c97f24";
-  g.beginPath(); g.arc(7, 6 + bob, 2.4, 0, Math.PI * 2); g.fill();
-  g.beginPath(); g.arc(19, 6 + bob, 2.4, 0, Math.PI * 2); g.fill();
-  // face details depend on facing direction
-  g.fillStyle = "#23150a";
-  if (dir === 2) {            // SOUTH - facing camera
-    g.fillRect(10, 12 + bob, 2, 2);
-    g.fillRect(15, 12 + bob, 2, 2);
-    g.fillRect(12, 16 + bob, 3, 2); // nose/mouth
-  } else if (dir === 0) {     // NORTH - facing away
-    g.fillStyle = "#b5701f";
-    g.beginPath(); g.ellipse(13, 13 + bob, 7, 7, 0, 0, Math.PI * 2); g.fill();
-  } else if (dir === 1) {     // EAST
-    g.fillRect(16, 12 + bob, 2, 2);
-    g.fillRect(17, 15 + bob, 2, 2);
-  } else {                    // WEST
-    g.fillRect(9, 12 + bob, 2, 2);
-    g.fillRect(8, 15 + bob, 2, 2);
+  g.fillStyle = blue;
+  roundRect(g, 8, 21 + bob, 11, 11, 4); g.fill();
+  g.fillStyle = blueDark;
+  roundRect(g, 9, 22 + bob, 9, 2, 1); g.fill(); // belt line
+
+  // arms
+  g.fillStyle = blue;
+  if (dir === 1) {
+    g.fillRect(18, 22 + bob, 4, 7);
+  } else if (dir === 3) {
+    g.fillRect(5, 22 + bob, 4, 7);
+  } else {
+    g.fillRect(6, 23 + bob, 3, 6);
+    g.fillRect(18, 23 + bob, 3, 6);
+  }
+
+  // head
+  g.fillStyle = blue;
+  g.beginPath(); g.ellipse(13, 15 + bob, 6, 6.5, 0, 0, Math.PI * 2); g.fill();
+
+  // white Phrygian cap
+  g.fillStyle = white;
+  if (dir === 0) {
+    g.beginPath();
+    g.moveTo(6, 12 + bob);
+    g.quadraticCurveTo(13, -1 + bob, 20, 12 + bob);
+    g.lineTo(18, 14 + bob);
+    g.lineTo(8, 14 + bob);
+    g.closePath();
+    g.fill();
+  } else if (dir === 2) {
+    g.beginPath();
+    g.moveTo(5, 10 + bob);
+    g.quadraticCurveTo(13, -3 + bob, 21, 10 + bob);
+    g.lineTo(19, 12 + bob);
+    g.lineTo(7, 12 + bob);
+    g.closePath();
+    g.fill();
+    g.beginPath();
+    g.moveTo(16, 9 + bob);
+    g.quadraticCurveTo(23, 7 + bob, 24, 14 + bob);
+    g.lineTo(17, 12 + bob);
+    g.fill();
+  } else if (dir === 1) {
+    g.beginPath();
+    g.moveTo(8, 11 + bob);
+    g.quadraticCurveTo(15, -2 + bob, 21, 8 + bob);
+    g.quadraticCurveTo(23, 12 + bob, 16, 13 + bob);
+    g.closePath();
+    g.fill();
+  } else {
+    g.beginPath();
+    g.moveTo(20, 11 + bob);
+    g.quadraticCurveTo(11, -2 + bob, 5, 8 + bob);
+    g.quadraticCurveTo(3, 12 + bob, 10, 13 + bob);
+    g.closePath();
+    g.fill();
+  }
+
+  // face
+  g.fillStyle = "#1a1a2e";
+  if (dir === 2) {
+    g.fillRect(10, 14 + bob, 2, 2);
+    g.fillRect(15, 14 + bob, 2, 2);
+    g.fillRect(12, 17 + bob, 2, 1);
+  } else if (dir === 0) {
+    g.fillStyle = blueDark;
+    g.fillRect(11, 13 + bob, 4, 3);
+  } else if (dir === 1) {
+    g.fillRect(16, 14 + bob, 2, 2);
+    g.fillRect(18, 16 + bob, 3, 3);
+  } else {
+    g.fillRect(9, 14 + bob, 2, 2);
+    g.fillRect(6, 16 + bob, 3, 3);
   }
   g.restore();
 }

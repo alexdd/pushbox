@@ -1,10 +1,8 @@
 /*
-The MIT License (MIT)
-
-Copyright (c) 2005 Alex Duesel, http://www.tekturcms.de
-HTML5 / JavaScript conversion (c) 2025
-
-  PushBoxCanvas.js  --  port of the 2005 PushBoxCanvas.java.
+ * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
+ * All rights reserved.
+ *
+ * PushBoxCanvas.js  --  port of the 2005 PushBoxCanvas.java.
 
   The original extended Nokia's FullCanvas and ran its own Thread.  Here the
   same logic runs inside a <canvas>; the game thread's run() loop is fed by a

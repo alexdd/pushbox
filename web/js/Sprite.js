@@ -1,10 +1,8 @@
 /*
-The MIT License (MIT)
-
-Copyright (c) 2005 Alex Duesel, http://www.tekturcms.de
-HTML5 / JavaScript conversion (c) 2025
-
-  Sprite.js  --  direct port of the 2005 Sprite.java.
+ * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
+ * All rights reserved.
+ *
+ * Sprite.js  --  direct port of the 2005 Sprite.java.
   The class structure, constants, field list and the movement / pushing
   logic are kept 1:1 with the original Java so the old code stays
   recognizable; only the syntax is now JavaScript.
