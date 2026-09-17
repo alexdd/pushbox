@@ -259,6 +259,42 @@
     return false;
   }
 
+  function plantVillageGrove(world, village, trees) {
+    const ring = [
+      [8, -5], [-8, 4], [6, 7], [-7, -6],
+      [11, -4], [12, 5], [-12, 3], [-11, -6],
+      [9, 11], [-8, 12], [14, -1], [-14, 0],
+      [7, -12], [-6, -13], [13, 9], [-13, 8]
+    ];
+    for (let i = 0; i < ring.length; i++) {
+      const tx = village.x + ring[i][0];
+      const ty = village.y + ring[i][1];
+      if (!canPlant(world, tx, ty)) continue;
+      markBlocked(world, tx, ty);
+      trees.push({ x: tx, y: ty, variant: i % 2 });
+    }
+  }
+
+  function addHatenoRiver(world) {
+    const y0 = 532;
+    for (let x = 420; x <= 590; x++) {
+      for (let w = -2; w <= 2; w++) {
+        const y = y0 + w;
+        if (!inBounds(x, y, world.size)) continue;
+        const t = getTile(world, x, y);
+        if (t === TILE.FLOOR || t === TILE.WALL) continue;
+        const onRoad = t === TILE.PATH || t === TILE.BRIDGE || Math.abs(x - 500) <= 2;
+        if (onRoad) setTile(world, x, y, TILE.BRIDGE);
+        else if (Math.abs(w) === 2) {
+          if (t === TILE.GRASS || t === TILE.FLOWER) setTile(world, x, y, TILE.SAND);
+        } else {
+          setTile(world, x, y, TILE.WATER);
+        }
+      }
+    }
+    carvePath(world, 500, 500, 500, 555);
+  }
+
   function scatterRocksAndFlowers(world, rng) {
     for (let i = 0; i < 420; i++) {
       const x = 6 + ((rng() * (world.size - 12)) | 0);
@@ -361,6 +397,10 @@
     }
 
     world.trees = plantForests(world, rng);
+    for (let i = 0; i < world.villages.length; i++) {
+      plantVillageGrove(world, world.villages[i], world.trees);
+    }
+    addHatenoRiver(world);
     scatterRocksAndFlowers(world, rng);
 
     // Keep village plazas clear of leftover rocks and make sure spawn is open.
