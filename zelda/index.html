@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>Hyrule — isometrischer MMORPG-Prototyp</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23142e1c'/><polygon points='8,2 14,8 8,14 2,8' fill='%233d9a3a'/></svg>" />
+<link rel="stylesheet" href="css/game.css" />
+</head>
+<body>
+  <canvas id="screen" width="320" height="208"></canvas>
+
+  <header id="hud" class="hidden">
+    <div class="hud-left">
+      <strong id="hud-place">Hateno</strong>
+      <span>Kachel <em id="hud-pos">500,500</em></span>
+    </div>
+    <div class="hud-right">
+      <span id="status">…</span>
+      <span class="online">Spieler <em id="hud-online">1/5</em></span>
+    </div>
+  </header>
+
+  <section id="login">
+    <div class="card">
+      <p class="kicker">PushBox Tile-Engine · 1000×1000</p>
+      <h1>HYRULE</h1>
+      <p class="lead">Isometrischer Zelda-Klon. Bis zu fünf Helden wandern gemeinsam durch Dörfer, Wälder, Flüsse und Brücken.</p>
+      <p id="server-meta" class="meta">Lade Welt…</p>
+      <form id="join-form">
+        <label for="name">Heldname</label>
+        <input id="name" name="name" maxlength="16" autocomplete="nickname" placeholder="Link" required />
+        <button type="submit">Welt betreten</button>
+        <p id="login-error" class="error"></p>
+      </form>
+      <p class="hint">Tastatur: Pfeile / WASD · E winken · Enter chat. Smartphone: Steuerkreuz.</p>
+      <p class="back"><a href="/">← zurück zu PushBox</a></p>
+    </div>
+  </section>
+
+  <div id="pad" class="hidden">
+    <div class="dpad">
+      <button id="pad-up" aria-label="Norden">▲</button>
+      <button id="pad-left" aria-label="Westen">◀</button>
+      <button id="pad-right" aria-label="Osten">▶</button>
+      <button id="pad-down" aria-label="Süden">▼</button>
+    </div>
+    <button id="pad-act" aria-label="Winken">👋</button>
+  </div>
+
+  <aside id="chat" class="hidden">
+    <div id="chat-log"></div>
+    <form id="chat-form">
+      <input id="chat-input" maxlength="80" placeholder="Nachricht…" autocomplete="off" />
+      <button type="submit">OK</button>
+    </form>
+  </aside>
+
+  <script src="/js/runtime.js"></script>
+  <script src="/js/Sprite.js"></script>
+  <script src="/shared/world.js"></script>
+  <script src="/zelda/js/assets.js"></script>
+  <script src="/zelda/js/ZeldaCanvas.js"></script>
+  <script src="/zelda/js/game.js"></script>
+</body>
+</html>
