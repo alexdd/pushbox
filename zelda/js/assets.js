@@ -291,29 +291,79 @@ function drawPyramidRoof(g, cx, cy, hw, hh, rise, color) {
   return { N, E, S, W, P };
 }
 
-function drawShikhara(g, cx, baseCy, baseHw, stories, stone, accent) {
-  let hw = baseHw;
-  let cy = baseCy;
-  const vols = [];
-  for (let i = 0; i < stories; i++) {
-    const t = i / Math.max(1, stories - 1);
-    const taper = 1 - Math.pow(t, 1.35);
-    hw = Math.max(4, Math.round(baseHw * taper));
-    const hh = Math.max(2, Math.round(hw * 0.5));
-    const band = Math.max(6, 10 - (i >> 1));
-    cy -= band;
-    const left = shadeHex(stone, 0.78 + t * 0.08);
-    const right = shadeHex(stone, 1.02 + t * 0.06);
-    const top = i === stories - 1 ? accent : shadeHex(stone, 1.12);
-    const vol = drawIsoVolume(g, cx, cy, hw, hh, band, left, right, top);
-    drawIsoCourses(g, vol, 2, shadeHex(left, 0.86), shadeHex(right, 0.9));
-    if (i % 2 === 0) {
-      drawIsoPanel(g, vol, "L", 0.35, 0.65, 0.2, 0.78, shadeHex(accent, 0.7));
-      drawIsoPanel(g, vol, "R", 0.35, 0.65, 0.2, 0.78, shadeHex(accent, 0.85));
-    }
-    vols.push(vol);
+function nagaraWidth(t, baseHw) {
+  return baseHw * (1 - Math.pow(Math.min(1, Math.max(0, t)), 2.45));
+}
+
+function drawShikharaMass(g, cx, baseCy, baseHw, height, fill) {
+  const steps = 18;
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const hw = Math.max(2, nagaraWidth(t, baseHw)) + 2;
+    pts.push(isoPt(cx + hw, baseCy - height * t));
   }
-  return vols.length ? vols[vols.length - 1] : null;
+  pts.push(isoPt(cx, baseCy + baseHw * 0.5 + 3));
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const hw = Math.max(2, nagaraWidth(t, baseHw)) + 2;
+    pts.push(isoPt(cx - hw, baseCy - height * t));
+  }
+  fillPoly(g, pts, fill);
+}
+
+function drawShikhara(g, cx, baseCy, baseHw, height, stone, accent) {
+  drawShikharaMass(g, cx, baseCy, baseHw, height, shadeHex(stone, 0.4));
+  const steps = Math.max(16, (height / 3) | 0);
+  const band = Math.ceil(height / steps) + 2;
+  let top = null;
+  for (let i = 0; i < steps; i++) {
+    const t = (i + 1) / steps;
+    const hw = Math.max(3, Math.round(nagaraWidth(t, baseHw)));
+    const hh = Math.max(2, Math.round(hw * 0.5));
+    const cy = baseCy - Math.round(height * t);
+    const shade = 0.7 + t * 0.24;
+    top = drawIsoVolume(g, cx, cy, hw, hh, band,
+      shadeHex(stone, shade), shadeHex(stone, shade + 0.26),
+      i === steps - 1 ? accent : shadeHex(stone, 1.1));
+    if (i % 4 === 3) {
+      drawIsoVolume(g, cx, cy + 1, hw + 2, Math.max(2, hh + 1), 3,
+        shadeHex(accent, 0.62), shadeHex(accent, 0.88), shadeHex(stone, 1.16));
+    } else if (i % 4 === 1 && hw > 7) {
+      drawIsoPanel(g, top, "L", 0.38, 0.62, 0.15, 0.7, shadeHex(accent, 0.58));
+      drawIsoPanel(g, top, "R", 0.38, 0.62, 0.15, 0.7, shadeHex(accent, 0.72));
+    }
+  }
+  return top;
+}
+
+function drawHipRoof(g, cx, cy, hw, hh, rise, color) {
+  const N = isoPt(cx, cy - hh);
+  const E = isoPt(cx + hw, cy);
+  const S = isoPt(cx, cy + hh);
+  const W = isoPt(cx - hw, cy);
+  const rw = Math.max(3, hw * 0.2);
+  const rh = Math.max(2, hh * 0.2);
+  const RN = isoPt(cx, cy - rise - rh);
+  const RS = isoPt(cx, cy - rise + rh);
+  const RE = isoPt(cx + rw, cy - rise);
+  const RW = isoPt(cx - rw, cy - rise);
+  fillPoly(g, expandPoly([RN, E, S, W], cx, cy - rise * 0.3, 1.3), shadeHex(color, 0.36));
+  fillPoly(g, [RW, RS, S, W], shadeHex(color, 0.7));
+  fillPoly(g, [RS, RE, E, S], shadeHex(color, 1.02));
+  fillPoly(g, [RE, RN, N, E], shadeHex(color, 1.14));
+  fillPoly(g, [RN, RW, W, N], shadeHex(color, 0.86));
+  fillPoly(g, [RN, RE, RS, RW], shadeHex(color, 1.18));
+  for (let i = 1; i <= 5; i++) {
+    const t = i / 6;
+    const k = 1 - t * 0.82;
+    const y = cy - rise * t;
+    const dE = isoPt(cx + hw * k, y);
+    const dS = isoPt(cx, y + hh * k);
+    const dW = isoPt(cx - hw * k, y);
+    fillPoly(g, [dW, dS, isoPt(dS[0], dS[1] + 1), isoPt(dW[0], dW[1] + 1)], shadeHex(color, 0.58));
+    fillPoly(g, [dS, dE, isoPt(dE[0], dE[1] + 1), isoPt(dS[0], dS[1] + 1)], shadeHex(color, 0.9));
+  }
 }
 
 function drawAmalaka(g, cx, cy, hw, gold) {
@@ -420,45 +470,49 @@ function makeHouseSprite(roof) {
   const im = newImage(104, 114);
   const g = im.getContext("2d");
   g.imageSmoothingEnabled = false;
-  const roofs = ["#c4452b", "#2f6fbf", "#3d8a3a"];
+  const roofs = ["#b84328", "#c47a2a", "#8a7a38"];
   const roofC = roofs[roof % 3];
-  const plaster = "#e6d2ae";
-  const stone = "#9a8460";
+  const mud = roof === 1 ? "#d2b07a" : (roof === 2 ? "#c4a060" : "#d8bc88");
+  const stone = "#7a6240";
 
-  g.fillStyle = "rgba(0,0,0,0.28)";
+  g.fillStyle = "rgba(0,0,0,0.3)";
   g.beginPath();
   g.ellipse(52, 107, 40, 6, 0, 0, Math.PI * 2);
   g.fill();
 
-  const plinth = drawIsoVolume(g, 52, 84, 40, 20, 9,
-    shadeHex(stone, 0.72), shadeHex(stone, 0.95), shadeHex(stone, 1.1));
-  drawIsoCourses(g, plinth, 2, shadeHex(stone, 0.6), shadeHex(stone, 0.8));
+  fillPoly(g, [
+    isoPt(52, 34), isoPt(92, 62), isoPt(94, 88),
+    isoPt(52, 110), isoPt(10, 88), isoPt(12, 62)
+  ], shadeHex(mud, 0.38));
 
-  const hall = drawIsoVolume(g, 52, 60, 32, 16, 24,
-    shadeHex(plaster, 0.78), shadeHex(plaster, 1.02), shadeHex(plaster, 1.12));
-  drawIsoCourses(g, hall, 3, shadeHex(plaster, 0.7), shadeHex(plaster, 0.88));
-  drawIsoPanel(g, hall, "L", 0.18, 0.48, 0.22, 0.58, shadeHex("#6a8aa0", 0.85));
-  drawIsoPanel(g, hall, "L", 0.22, 0.44, 0.28, 0.52, "#7aa8b8");
-  drawIsoPanel(g, hall, "L", 0.28, 0.32, 0.28, 0.52, shadeHex("#3a5460", 1));
-  drawIsoPanel(g, hall, "L", 0.22, 0.44, 0.38, 0.42, shadeHex("#3a5460", 1));
+  const plinth = drawIsoVolume(g, 52, 86, 40, 20, 10,
+    shadeHex(stone, 0.7), shadeHex(stone, 0.94), shadeHex(stone, 1.08));
+  drawIsoCourses(g, plinth, 2, shadeHex(stone, 0.58), shadeHex(stone, 0.78));
 
-  drawPyramidRoof(g, 52, 60, 36, 18, 32, roofC);
-  drawIsoVolume(g, 52, 62, 36, 18, 3,
-    shadeHex(roofC, 0.55), shadeHex(roofC, 0.75), shadeHex(roofC, 0.85));
+  const hall = drawIsoVolume(g, 52, 64, 32, 16, 24,
+    shadeHex(mud, 0.76), shadeHex(mud, 1.02), shadeHex(mud, 1.12));
+  drawIsoCourses(g, hall, 3, shadeHex(mud, 0.68), shadeHex(mud, 0.86));
+  drawIsoPanel(g, hall, "L", 0.16, 0.5, 0.2, 0.62, shadeHex("#5a4030", 0.9));
+  drawIsoPanel(g, hall, "L", 0.22, 0.44, 0.28, 0.54, shadeHex("#6a8a70", 0.85));
+  drawIsoPanel(g, hall, "L", 0.3, 0.36, 0.28, 0.54, "#3a3020");
+  drawIsoPanel(g, hall, "L", 0.22, 0.44, 0.38, 0.42, "#3a3020");
 
-  const porch = drawIsoVolume(g, 52, 78, 18, 9, 14,
-    shadeHex(plaster, 0.7), shadeHex(plaster, 0.96), shadeHex("#c9a36a", 1.05));
-  drawIsoPanel(g, porch, "R", 0.22, 0.78, 0.18, 0.95, "#5a3318");
-  drawIsoPanel(g, porch, "R", 0.32, 0.68, 0.28, 0.95, "#3d2210");
-  drawIsoPanel(g, porch, "L", 0.55, 0.82, 0.2, 0.7, shadeHex("#5a3318", 0.9));
-  drawIsoVolume(g, 40, 72, 3, 2, 18, "#8a6238", "#b08450", "#d4b078");
-  drawIsoVolume(g, 64, 72, 3, 2, 18, "#8a6238", "#b08450", "#d4b078");
+  drawHipRoof(g, 52, 64, 38, 18, 22, roofC);
+  drawIsoVolume(g, 52, 66, 38, 18, 3,
+    shadeHex(roofC, 0.52), shadeHex(roofC, 0.72), shadeHex(roofC, 0.82));
 
-  g.fillStyle = "#6b3f1f";
-  g.fillRect(70, 28, 3, 14);
-  g.fillStyle = roofC;
-  fillPoly(g, [isoPt(73, 28), isoPt(82, 24), isoPt(73, 32)], shadeHex(roofC, 1.1));
+  const porch = drawIsoVolume(g, 52, 80, 18, 9, 14,
+    shadeHex(mud, 0.68), shadeHex(mud, 0.94), shadeHex("#b08950", 1.02));
+  drawIsoPanel(g, porch, "R", 0.18, 0.82, 0.16, 0.95, "#4a2814");
+  drawIsoPanel(g, porch, "R", 0.3, 0.7, 0.28, 0.95, "#2e180c");
+  drawIsoPanel(g, porch, "R", 0.12, 0.88, 0.1, 0.22, "#c4a060");
+  drawIsoPanel(g, porch, "L", 0.55, 0.86, 0.22, 0.72, "#4a2814");
+  drawIsoVolume(g, 40, 74, 3, 2, 16, "#6a4424", "#a07840", "#d2aa70");
+  drawIsoVolume(g, 64, 74, 3, 2, 16, "#6a4424", "#a07840", "#d2aa70");
 
+  g.fillStyle = "#5a3318";
+  g.fillRect(71, 40, 2, 12);
+  fillPoly(g, [isoPt(73, 40), isoPt(82, 36), isoPt(73, 46)], "#e08a1e");
   return im;
 }
 
@@ -475,6 +529,13 @@ function makeTempleSprite(deityId) {
   g.ellipse(74, 168, 56, 7, 0, 0, Math.PI * 2);
   g.fill();
 
+  fillPoly(g, [
+    isoPt(74, 14), isoPt(88, 28), isoPt(108, 70), isoPt(130, 132),
+    isoPt(130, 148), isoPt(74, 170), isoPt(18, 148), isoPt(18, 132),
+    isoPt(40, 70), isoPt(60, 28)
+  ], shadeHex(stone, 0.36));
+  drawShikharaMass(g, 74, 108, 28, 72, shadeHex(stone, 0.38));
+
   const jagati = drawIsoVolume(g, 74, 132, 56, 28, 12,
     shadeHex(stone, 0.62), shadeHex(stone, 0.88), shadeHex(stone, 1.08));
   drawIsoCourses(g, jagati, 3, shadeHex(stone, 0.5), shadeHex(stone, 0.72));
@@ -484,19 +545,19 @@ function makeTempleSprite(deityId) {
     drawIsoPanel(g, jagati, "R", t - 0.05, t + 0.03, 0.15, 0.85, shadeHex(theme.gold, 0.85));
   }
 
-  drawIsoVolume(g, 50, 128, 10, 5, 18, shadeHex(stone, 0.7), shadeHex(stone, 0.92), shadeHex(accent, 0.95));
-  drawShikhara(g, 50, 128, 9, 3, shadeHex(stone, 0.95), accent);
-  drawIsoVolume(g, 98, 128, 10, 5, 18, shadeHex(stone, 0.7), shadeHex(stone, 0.92), shadeHex(accent, 0.95));
-  drawShikhara(g, 98, 128, 9, 3, shadeHex(stone, 0.95), accent);
+  drawIsoVolume(g, 50, 124, 11, 6, 20, shadeHex(stone, 0.7), shadeHex(stone, 0.92), shadeHex(accent, 0.95));
+  drawShikhara(g, 50, 124, 10, 34, shadeHex(stone, 0.95), accent);
+  drawIsoVolume(g, 98, 124, 11, 6, 20, shadeHex(stone, 0.7), shadeHex(stone, 0.92), shadeHex(accent, 0.95));
+  drawShikhara(g, 98, 124, 10, 34, shadeHex(stone, 0.95), accent);
 
-  const garbha = drawIsoVolume(g, 74, 108, 30, 15, 24,
+  const garbha = drawIsoVolume(g, 74, 108, 30, 15, 26,
     shadeHex(stone, 0.74), shadeHex(stone, 1.0), shadeHex(stone, 1.12));
   drawIsoCourses(g, garbha, 4, shadeHex(stone, 0.64), shadeHex(stone, 0.86));
   drawIsoPanel(g, garbha, "L", 0.12, 0.88, 0.08, 0.2, theme.gold);
   drawIsoPanel(g, garbha, "R", 0.12, 0.88, 0.08, 0.2, shadeHex(theme.gold, 0.85));
 
-  const cap = drawShikhara(g, 74, 108, 28, 8, stone, accent);
-  const amalakaY = cap ? cap.cy - 4 : 42;
+  const cap = drawShikhara(g, 74, 108, 26, 70, stone, accent);
+  const amalakaY = cap ? cap.cy - 3 : 36;
   drawAmalaka(g, 74, amalakaY, 11, theme.gold);
   drawKalasha(g, 74, amalakaY - 6, theme.gold, theme.flag);
 
@@ -541,9 +602,9 @@ function makeDeityShrine(deityId) {
     shadeHex(theme.stone, 0.74), shadeHex(theme.stone, 1.0), shadeHex(theme.stone, 1.12));
   drawIsoPanel(g, cella, "R", 0.2, 0.8, 0.2, 0.9, theme.door);
   drawIsoPanel(g, cella, "R", 0.32, 0.68, 0.32, 0.78, theme.accent);
-  drawShikhara(g, 26, 42, 10, 4, theme.stone, theme.accent);
-  drawAmalaka(g, 26, 18, 6, theme.gold);
-  drawKalasha(g, 26, 14, theme.gold, theme.flag);
+  drawShikhara(g, 26, 42, 10, 24, theme.stone, theme.accent);
+  drawAmalaka(g, 26, 16, 6, theme.gold);
+  drawKalasha(g, 26, 12, theme.gold, theme.flag);
   drawIsoPanel(g, base, "L", 0.2, 0.8, 0.2, 0.8, theme.gold);
   return im;
 }

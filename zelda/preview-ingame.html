@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>In-game Tempelansicht</title>
+<style>
+  body { margin: 0; background: #111; color: #eee; font-family: Georgia, serif; }
+  h1 { margin: 12px 16px; font-weight: 400; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 16px; padding: 0 16px 24px; }
+  canvas { image-rendering: pixelated; width: 960px; height: 720px; box-shadow: 0 0 0 1px #333; }
+</style>
+</head>
+<body>
+  <h1>Kailash-Tempel und Ashram-Hütte im Tile-Engine</h1>
+  <div class="wrap">
+    <canvas id="temple" width="480" height="360"></canvas>
+    <canvas id="house" width="480" height="360"></canvas>
+  </div>
+  <pre id="diag" style="margin:16px;color:#9ad;font-size:12px"></pre>
+  <script src="/js/runtime.js"></script>
+  <script src="/js/Sprite.js"></script>
+  <script src="/shared/catalog.js"></script>
+  <script src="/shared/world.js"></script>
+  <script src="/zelda/js/assets.js"></script>
+  <script src="/zelda/js/ZeldaCanvas.js"></script>
+  <script>
+    const assets = buildHyruleAssets();
+    const world = ZeldaWorld.generateWorld(1998, 1000);
+
+    function shot(canvasId, tx, ty, name) {
+      const screen = document.getElementById(canvasId);
+      const engine = new ZeldaCanvas(screen);
+      engine.resize(480, 360);
+      engine.loadWorld(world, assets);
+      engine.spawnLocal({
+        id: 1, name: name, slot: 0, color: "#c45c26", gender: "female",
+        tx: tx, ty: ty, dir: 2
+      });
+      engine.state = ZeldaCanvas.STATE_GAME;
+      engine.paint();
+      return engine;
+    }
+
+    const templeEngine = shot("temple", world.spawn.x, world.spawn.y, "Mira");
+    const hut = world.houses.find((h) => Math.abs(h.x - world.spawn.x) < 12);
+    shot("house", hut.x + 2, hut.y + 3, "Mira");
+
+    const tprop = templeEngine.props.find((p) => p.kind === "temple" && p.deity === "shiva");
+    const c = document.getElementById("temple");
+    const ctx = c.getContext("2d");
+    const img = ctx.getImageData(0, 0, c.width, c.height).data;
+    let purple = 0, gold = 0, mud = 0;
+    for (let i = 0; i < img.length; i += 4) {
+      const r = img[i], g = img[i + 1], b = img[i + 2], a = img[i + 3];
+      if (a < 10) continue;
+      if (r > 70 && r < 160 && g > 70 && g < 160 && b > 90 && b > r) purple++;
+      if (r > 180 && g > 140 && b < 120) gold++;
+      if (r > 140 && g > 90 && g < 160 && b < 110) mud++;
+    }
+    document.getElementById("diag").textContent = JSON.stringify({
+      spawn: world.spawn,
+      templeTile: tprop && { x: tprop.tileX, y: tprop.tileY, w: tprop.swidth, h: tprop.sheight, ox: tprop.offsetX, oy: tprop.offsetY },
+      templeWorld: tprop && { x: tprop.x, y: tprop.y },
+      cam: { x: templeEngine.camX, y: templeEngine.camY, vw: templeEngine.viewW, vh: templeEngine.viewH },
+      pixels: { purple: purple, gold: gold, mud: mud },
+      visibleTemples: templeEngine.visibleProps.filter((p) => p.kind === "temple").map((p) => p.deity)
+    }, null, 2);
+  </script>
+</body>
+</html>

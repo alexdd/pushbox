@@ -185,7 +185,7 @@
     }
     stampDisk(world, cx, cy, 3, TILE.PATH);
 
-    const templeFoot = { x: cx - 1, y: cy - 6, w: 3, h: 3 };
+    const templeFoot = { x: cx - 1, y: cy - 3, w: 3, h: 3 };
     if (canPlaceHouse(world, templeFoot.x, templeFoot.y, templeFoot.w, templeFoot.h)) {
       occupyHouse(world, templeFoot);
     }
@@ -287,7 +287,7 @@
       x: site.x,
       y: site.y,
       tx: site.x - 1,
-      ty: site.y - 6,
+      ty: site.y - 3,
       w: 3,
       h: 3
     };

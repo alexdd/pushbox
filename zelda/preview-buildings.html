@@ -13,19 +13,26 @@
   canvas {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    background:
-      repeating-linear-gradient(180deg, #3d9a3a 0 12px, #348434 12px 24px);
+    background-color: #c43b7a;
+    background-image:
+      linear-gradient(45deg, #2a1020 25%, transparent 25%),
+      linear-gradient(-45deg, #2a1020 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #2a1020 75%),
+      linear-gradient(-45deg, transparent 75%, #2a1020 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
     box-shadow: 0 0 0 1px #0d1a0e;
   }
-  .grassB canvas { background: repeating-linear-gradient(180deg, #46a944 0 12px, #2f7a32 12px 24px); }
+  pre { margin: 0 24px 32px; color: #9ad; font-size: 12px; }
 </style>
 </head>
 <body>
   <h1>Nagara-Mandir &amp; Ashram-Hütten</h1>
-  <p>Geschlossene Iso-Körper, Shikhara, Amalaka, Kalasha — keine durchsichtigen Wände.</p>
+  <p>Magenta-Karos zeigen Löcher. Wände müssen geschlossen sein; Türme geschwungen, nicht pyramidenförmig.</p>
   <div id="houses" class="row"></div>
   <div id="temples" class="row"></div>
   <div id="shrines" class="row"></div>
+  <pre id="stats"></pre>
   <script src="/js/runtime.js"></script>
   <script src="/zelda/js/assets.js"></script>
   <script>
@@ -44,7 +51,36 @@
       fig.appendChild(cap);
       parent.appendChild(fig);
     }
-    ["Terrakotta", "Indigo", "Waldgrün"].forEach((n, i) => {
+    function stats(im, name) {
+      const g = im.getContext("2d");
+      const d = g.getImageData(0, 0, im.width, im.height).data;
+      let opaque = 0, holes = 0, minx = im.width, miny = im.height, maxx = 0, maxy = 0;
+      for (let y = 0; y < im.height; y++) {
+        for (let x = 0; x < im.width; x++) {
+          const a = d[(y * im.width + x) * 4 + 3];
+          if (a > 200) {
+            opaque++;
+            if (x < minx) minx = x;
+            if (y < miny) miny = y;
+            if (x > maxx) maxx = x;
+            if (y > maxy) maxy = y;
+          }
+        }
+      }
+      for (let y = miny + 3; y <= maxy - 3; y++) {
+        for (let x = minx + 3; x <= maxx - 3; x++) {
+          const a = d[(y * im.width + x) * 4 + 3];
+          if (a > 80) continue;
+          let n = 0;
+          [[-3, 0], [3, 0], [0, -3], [0, 3]].forEach((p) => {
+            if (d[((y + p[1]) * im.width + x + p[0]) * 4 + 3] > 200) n++;
+          });
+          if (n >= 3) holes++;
+        }
+      }
+      return { name: name, opaque: opaque, interiorHoles: holes, box: [minx, miny, maxx, maxy] };
+    }
+    ["Terrakotta", "Sandstein", "Stroh"].forEach((n, i) => {
       show(document.getElementById("houses"), "Ashram " + n, a.houses[i], 3);
     });
     Object.keys(a.temples).forEach((k) => {
@@ -53,6 +89,11 @@
     Object.keys(a.shrines).forEach((k) => {
       show(document.getElementById("shrines"), "Schrein " + k, a.shrines[k], 3);
     });
+    const report = []
+      .concat(a.houses.map((im, i) => stats(im, "house" + i)))
+      .concat(Object.keys(a.temples).map((k) => stats(a.temples[k], "temple-" + k)))
+      .concat(Object.keys(a.shrines).map((k) => stats(a.shrines[k], "shrine-" + k)));
+    document.getElementById("stats").textContent = JSON.stringify(report, null, 2);
   </script>
 </body>
 </html>

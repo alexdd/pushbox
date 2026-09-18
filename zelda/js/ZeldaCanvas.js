@@ -360,7 +360,7 @@ class ZeldaCanvas {
       this.props.push(p);
       this.addToHash(p);
       if (assets.shrines && assets.shrines[t.deity]) {
-        const shrine = new Prop("shrine", t.x, t.y - 3, assets.shrines[t.deity], 1, 1, -18, -68);
+        const shrine = new Prop("shrine", t.x + 2, t.y + 1, assets.shrines[t.deity], 1, 1, -18, -68);
         shrine.deity = t.deity;
         shrine.label = t.deity;
         shrine.place(this);
