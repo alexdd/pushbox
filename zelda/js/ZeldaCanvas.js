@@ -344,7 +344,7 @@ class ZeldaCanvas {
     for (let i = 0; i < world.houses.length; i++) {
       const h = world.houses[i];
       const img = assets.houses[h.roof % 3];
-      const p = new Prop("house", h.x, h.y, img, h.w, h.h, -20, -58);
+      const p = new Prop("house", h.x, h.y, img, h.w, h.h, -33, -97);
       p.place(this);
       this.props.push(p);
       this.addToHash(p);
@@ -353,14 +353,14 @@ class ZeldaCanvas {
     for (let i = 0; i < temples.length; i++) {
       const t = temples[i];
       const img = (assets.temples && assets.temples[t.deity]) || assets.houses[0];
-      const p = new Prop("temple", t.tx, t.ty, img, t.w || 3, t.h || 3, -22, -78);
+      const p = new Prop("temple", t.tx, t.ty, img, t.w || 3, t.h || 3, -50, -156);
       p.deity = t.deity;
       p.label = t.name;
       p.place(this);
       this.props.push(p);
       this.addToHash(p);
       if (assets.shrines && assets.shrines[t.deity]) {
-        const shrine = new Prop("shrine", t.x, t.y - 3, assets.shrines[t.deity], 1, 1, -12, -50);
+        const shrine = new Prop("shrine", t.x, t.y - 3, assets.shrines[t.deity], 1, 1, -18, -68);
         shrine.deity = t.deity;
         shrine.label = t.deity;
         shrine.place(this);

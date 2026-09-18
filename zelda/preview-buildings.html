@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Tempel- und Hüttenvorschau</title>
+<style>
+  html, body { margin: 0; background: #1b2a1c; color: #f2e6c8; font-family: Georgia, serif; }
+  h1 { margin: 16px 24px 8px; font-weight: 400; letter-spacing: 0.04em; }
+  p { margin: 0 24px 16px; color: #c9d4b8; }
+  .row { display: flex; flex-wrap: wrap; gap: 28px; padding: 8px 24px 40px; }
+  figure { margin: 0; text-align: center; }
+  figcaption { margin-top: 8px; font-size: 13px; }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background:
+      repeating-linear-gradient(180deg, #3d9a3a 0 12px, #348434 12px 24px);
+    box-shadow: 0 0 0 1px #0d1a0e;
+  }
+  .grassB canvas { background: repeating-linear-gradient(180deg, #46a944 0 12px, #2f7a32 12px 24px); }
+</style>
+</head>
+<body>
+  <h1>Nagara-Mandir &amp; Ashram-Hütten</h1>
+  <p>Geschlossene Iso-Körper, Shikhara, Amalaka, Kalasha — keine durchsichtigen Wände.</p>
+  <div id="houses" class="row"></div>
+  <div id="temples" class="row"></div>
+  <div id="shrines" class="row"></div>
+  <script src="/js/runtime.js"></script>
+  <script src="/zelda/js/assets.js"></script>
+  <script>
+    const a = buildHyruleAssets();
+    function show(parent, label, im, scale) {
+      const fig = document.createElement("figure");
+      const c = document.createElement("canvas");
+      c.width = im.width * scale;
+      c.height = im.height * scale;
+      const g = c.getContext("2d");
+      g.imageSmoothingEnabled = false;
+      g.drawImage(im, 0, 0, c.width, c.height);
+      const cap = document.createElement("figcaption");
+      cap.textContent = label + " · " + im.width + "×" + im.height;
+      fig.appendChild(c);
+      fig.appendChild(cap);
+      parent.appendChild(fig);
+    }
+    ["Terrakotta", "Indigo", "Waldgrün"].forEach((n, i) => {
+      show(document.getElementById("houses"), "Ashram " + n, a.houses[i], 3);
+    });
+    Object.keys(a.temples).forEach((k) => {
+      show(document.getElementById("temples"), "Mandir " + k, a.temples[k], 2);
+    });
+    Object.keys(a.shrines).forEach((k) => {
+      show(document.getElementById("shrines"), "Schrein " + k, a.shrines[k], 3);
+    });
+  </script>
+</body>
+</html>

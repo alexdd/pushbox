@@ -187,143 +187,364 @@ function makeTreeSprite(pine) {
   return im;
 }
 
+function shadeHex(hex, factor) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const f = (c) => Math.max(0, Math.min(255, Math.round(c * factor)));
+  return "#" + [f(r), f(g), f(b)].map((c) => c.toString(16).padStart(2, "0")).join("");
+}
+
+function isoPt(x, y) {
+  return [Math.round(x), Math.round(y)];
+}
+
+function lerpPt(a, b, t) {
+  return isoPt(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
+}
+
+function fillPoly(g, pts, fill) {
+  if (!pts.length) return;
+  g.beginPath();
+  g.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+  g.closePath();
+  g.fillStyle = fill;
+  g.fill();
+}
+
+function expandPoly(pts, ox, oy, px) {
+  return pts.map((p) => {
+    const dx = p[0] - ox;
+    const dy = p[1] - oy;
+    const len = Math.hypot(dx, dy) || 1;
+    return isoPt(p[0] + (dx / len) * px, p[1] + (dy / len) * px);
+  });
+}
+
+/* Opaque silhouette first, then faces. No strokes, no axis-aligned holes. */
+function drawIsoVolume(g, cx, cy, hw, hh, h, left, right, top) {
+  const N = isoPt(cx, cy - hh);
+  const E = isoPt(cx + hw, cy);
+  const S = isoPt(cx, cy + hh);
+  const W = isoPt(cx - hw, cy);
+  const Nb = isoPt(N[0], N[1] + h);
+  const Eb = isoPt(E[0], E[1] + h);
+  const Sb = isoPt(S[0], S[1] + h);
+  const Wb = isoPt(W[0], W[1] + h);
+  const sil = expandPoly([N, E, Eb, Sb, Wb, W], cx, cy + (h >> 1), 1.2);
+  fillPoly(g, sil, shadeHex(left, 0.42));
+  fillPoly(g, [W, S, Sb, Wb], left);
+  fillPoly(g, [S, E, Eb, Sb], right);
+  fillPoly(g, [N, E, S, W], top);
+  return { N, E, S, W, Nb, Eb, Sb, Wb, cx, cy, hw, hh, h, left, right, top };
+}
+
+function drawIsoCourses(g, vol, n, leftInk, rightInk) {
+  for (let i = 1; i < n; i++) {
+    const y = (vol.h * i / n) | 0;
+    const W = [vol.W[0], vol.W[1] + y];
+    const S = [vol.S[0], vol.S[1] + y];
+    const E = [vol.E[0], vol.E[1] + y];
+    fillPoly(g, [W, S, [S[0], S[1] + 1], [W[0], W[1] + 1]], leftInk);
+    fillPoly(g, [S, E, [E[0], E[1] + 1], [S[0], S[1] + 1]], rightInk);
+  }
+}
+
+function faceQuad(vol, face, u0, u1, v0, v1) {
+  const topA = face === "L" ? lerpPt(vol.W, vol.S, u0) : lerpPt(vol.E, vol.S, u0);
+  const topB = face === "L" ? lerpPt(vol.W, vol.S, u1) : lerpPt(vol.E, vol.S, u1);
+  const A = isoPt(topA[0], topA[1] + vol.h * v0);
+  const B = isoPt(topB[0], topB[1] + vol.h * v0);
+  const C = isoPt(topB[0], topB[1] + vol.h * v1);
+  const D = isoPt(topA[0], topA[1] + vol.h * v1);
+  return [A, B, C, D];
+}
+
+function drawIsoPanel(g, vol, face, u0, u1, v0, v1, fill) {
+  fillPoly(g, faceQuad(vol, face, u0, u1, v0, v1), fill);
+}
+
+function drawPyramidRoof(g, cx, cy, hw, hh, rise, color) {
+  const N = isoPt(cx, cy - hh);
+  const E = isoPt(cx + hw, cy);
+  const S = isoPt(cx, cy + hh);
+  const W = isoPt(cx - hw, cy);
+  const P = isoPt(cx, cy - rise);
+  fillPoly(g, expandPoly([P, E, S, W], cx, cy - rise * 0.35, 1.2), shadeHex(color, 0.38));
+  fillPoly(g, [P, W, S], shadeHex(color, 0.72));
+  fillPoly(g, [P, S, E], shadeHex(color, 1.02));
+  fillPoly(g, [P, E, N], shadeHex(color, 1.14));
+  fillPoly(g, [P, N, W], shadeHex(color, 0.88));
+  for (let i = 1; i <= 4; i++) {
+    const t = i / 5;
+    const k = 1 - t;
+    const y = cy - rise * t;
+    const dN = isoPt(cx, y - hh * k);
+    const dE = isoPt(cx + hw * k, y);
+    const dS = isoPt(cx, y + hh * k);
+    const dW = isoPt(cx - hw * k, y);
+    fillPoly(g, [dW, dS, isoPt(dS[0], dS[1] + 1), isoPt(dW[0], dW[1] + 1)], shadeHex(color, 0.62));
+    fillPoly(g, [dS, dE, isoPt(dE[0], dE[1] + 1), isoPt(dS[0], dS[1] + 1)], shadeHex(color, 0.92));
+    fillPoly(g, [dN, dE, isoPt(dE[0], dE[1] + 1), isoPt(dN[0], dN[1] + 1)], shadeHex(color, 1.06));
+  }
+  return { N, E, S, W, P };
+}
+
+function drawShikhara(g, cx, baseCy, baseHw, stories, stone, accent) {
+  let hw = baseHw;
+  let cy = baseCy;
+  const vols = [];
+  for (let i = 0; i < stories; i++) {
+    const t = i / Math.max(1, stories - 1);
+    const taper = 1 - Math.pow(t, 1.35);
+    hw = Math.max(4, Math.round(baseHw * taper));
+    const hh = Math.max(2, Math.round(hw * 0.5));
+    const band = Math.max(6, 10 - (i >> 1));
+    cy -= band;
+    const left = shadeHex(stone, 0.78 + t * 0.08);
+    const right = shadeHex(stone, 1.02 + t * 0.06);
+    const top = i === stories - 1 ? accent : shadeHex(stone, 1.12);
+    const vol = drawIsoVolume(g, cx, cy, hw, hh, band, left, right, top);
+    drawIsoCourses(g, vol, 2, shadeHex(left, 0.86), shadeHex(right, 0.9));
+    if (i % 2 === 0) {
+      drawIsoPanel(g, vol, "L", 0.35, 0.65, 0.2, 0.78, shadeHex(accent, 0.7));
+      drawIsoPanel(g, vol, "R", 0.35, 0.65, 0.2, 0.78, shadeHex(accent, 0.85));
+    }
+    vols.push(vol);
+  }
+  return vols.length ? vols[vols.length - 1] : null;
+}
+
+function drawAmalaka(g, cx, cy, hw, gold) {
+  const hh = Math.max(3, Math.round(hw * 0.42));
+  const vol = drawIsoVolume(g, cx, cy, hw, hh, 5, shadeHex(gold, 0.72), shadeHex(gold, 1.05), shadeHex(gold, 1.18));
+  for (let i = 0; i < 5; i++) {
+    const t = (i + 0.5) / 5;
+    drawIsoPanel(g, vol, "L", t - 0.06, t + 0.04, 0.1, 0.9, shadeHex(gold, 0.55));
+    drawIsoPanel(g, vol, "R", t - 0.06, t + 0.04, 0.1, 0.9, shadeHex(gold, 0.8));
+  }
+  return vol;
+}
+
+function drawKalasha(g, cx, cy, gold, spike) {
+  fillPoly(g, [
+    isoPt(cx - 5, cy + 4), isoPt(cx + 5, cy + 4),
+    isoPt(cx + 4, cy), isoPt(cx - 4, cy)
+  ], shadeHex(gold, 0.85));
+  fillPoly(g, [
+    isoPt(cx - 4, cy), isoPt(cx + 4, cy),
+    isoPt(cx + 3, cy - 5), isoPt(cx - 3, cy - 5)
+  ], gold);
+  fillPoly(g, [
+    isoPt(cx - 2, cy - 5), isoPt(cx + 2, cy - 5),
+    isoPt(cx + 1, cy - 8), isoPt(cx - 1, cy - 8)
+  ], shadeHex(gold, 1.15));
+  fillPoly(g, [
+    isoPt(cx - 1, cy - 8), isoPt(cx + 1, cy - 8),
+    isoPt(cx, cy - 16)
+  ], spike || gold);
+}
+
+const TEMPLE_THEME = {
+  shiva: {
+    stone: "#8a8496", accent: "#5b4a8a", gold: "#e6c25a",
+    door: "#3a2a55", flag: "#c8d4e8"
+  },
+  kali: {
+    stone: "#4a3654", accent: "#8a1a2a", gold: "#d4a017",
+    door: "#2a0814", flag: "#c43b3b"
+  },
+  ganesha: {
+    stone: "#c9894a", accent: "#c45c26", gold: "#f2d24a",
+    door: "#6b2e12", flag: "#e08a1e"
+  },
+  lakshmi: {
+    stone: "#e6c9a4", accent: "#c45a6e", gold: "#f0d060",
+    door: "#8a3a48", flag: "#f2b6c2"
+  },
+  saraswati: {
+    stone: "#dce4ee", accent: "#4a7cb8", gold: "#f2d24a",
+    door: "#2f4f7a", flag: "#d8e6f2"
+  },
+  hanuman: {
+    stone: "#b85a3a", accent: "#c43b3b", gold: "#f0c24a",
+    door: "#6b1d2a", flag: "#e08a1e"
+  },
+  krishna: {
+    stone: "#4a6ea8", accent: "#2a4a7a", gold: "#f2d24a",
+    door: "#1a2e55", flag: "#3d8a3a"
+  }
+};
+
+function drawTempleOrnament(g, deityId, cx, peakY, mandapa) {
+  if (deityId === "shiva") {
+    g.fillStyle = "#e6c25a";
+    g.fillRect(cx - 1, peakY - 22, 2, 10);
+    g.fillRect(cx - 5, peakY - 18, 10, 2);
+    g.fillRect(cx - 5, peakY - 20, 2, 4);
+    g.fillRect(cx + 3, peakY - 20, 2, 4);
+  } else if (deityId === "kali") {
+    drawIsoPanel(g, mandapa, "R", 0.28, 0.72, 0.18, 0.42, "#c43b3b");
+  } else if (deityId === "ganesha") {
+    fillPoly(g, [
+      isoPt(cx - 7, peakY - 10), isoPt(cx - 2, peakY - 16), isoPt(cx + 2, peakY - 10)
+    ], "#f2d24a");
+  } else if (deityId === "lakshmi") {
+    for (let i = 0; i < 4; i++) {
+      const a = (i - 1.5) * 6;
+      fillPoly(g, [
+        isoPt(cx + a, peakY - 8), isoPt(cx + a + 3, peakY - 4), isoPt(cx + a - 3, peakY - 4)
+      ], "#f0d060");
+    }
+  } else if (deityId === "saraswati") {
+    g.fillStyle = "#4a7cb8";
+    g.fillRect(cx - 8, peakY - 12, 16, 2);
+    g.fillRect(cx - 1, peakY - 16, 2, 8);
+  } else if (deityId === "hanuman") {
+    g.fillStyle = "#e08a1e";
+    g.fillRect(cx + 4, peakY - 20, 2, 14);
+    fillPoly(g, [
+      isoPt(cx + 6, peakY - 20), isoPt(cx + 16, peakY - 16), isoPt(cx + 6, peakY - 12)
+    ], "#c43b3b");
+  } else if (deityId === "krishna") {
+    g.fillStyle = "#3d8a3a";
+    g.fillRect(cx + 2, peakY - 18, 2, 8);
+    fillPoly(g, [
+      isoPt(cx + 3, peakY - 18), isoPt(cx + 10, peakY - 22), isoPt(cx + 8, peakY - 14)
+    ], "#2a6b3a");
+  }
+}
+
 function makeHouseSprite(roof) {
-  const im = newImage(78, 72);
+  const im = newImage(104, 114);
   const g = im.getContext("2d");
   g.imageSmoothingEnabled = false;
-  const roofs = [HYRULE_PAL.roofR, HYRULE_PAL.roofB, HYRULE_PAL.roofG];
-  g.fillStyle = "rgba(0,0,0,0.22)";
+  const roofs = ["#c4452b", "#2f6fbf", "#3d8a3a"];
+  const roofC = roofs[roof % 3];
+  const plaster = "#e6d2ae";
+  const stone = "#9a8460";
+
+  g.fillStyle = "rgba(0,0,0,0.28)";
   g.beginPath();
-  g.ellipse(39, 66, 28, 6, 0, 0, Math.PI * 2);
+  g.ellipse(52, 107, 40, 6, 0, 0, Math.PI * 2);
   g.fill();
-  // isometric box
-  g.fillStyle = HYRULE_PAL.houseD;
-  g.beginPath();
-  g.moveTo(6, 38); g.lineTo(39, 52); g.lineTo(39, 68); g.lineTo(6, 54);
-  g.closePath();
-  g.fill();
-  g.fillStyle = HYRULE_PAL.house;
-  g.beginPath();
-  g.moveTo(72, 38); g.lineTo(39, 52); g.lineTo(39, 68); g.lineTo(72, 54);
-  g.closePath();
-  g.fill();
-  g.fillStyle = roofs[roof % 3];
-  g.beginPath();
-  g.moveTo(39, 8); g.lineTo(74, 28); g.lineTo(39, 44); g.lineTo(4, 28);
-  g.closePath();
-  g.fill();
-  g.fillStyle = "#5a3318";
-  g.fillRect(34, 54, 10, 14);
-  g.fillStyle = "#8ec8e8";
-  g.fillRect(16, 44, 8, 7);
-  g.fillRect(54, 42, 8, 7);
+
+  const plinth = drawIsoVolume(g, 52, 84, 40, 20, 9,
+    shadeHex(stone, 0.72), shadeHex(stone, 0.95), shadeHex(stone, 1.1));
+  drawIsoCourses(g, plinth, 2, shadeHex(stone, 0.6), shadeHex(stone, 0.8));
+
+  const hall = drawIsoVolume(g, 52, 60, 32, 16, 24,
+    shadeHex(plaster, 0.78), shadeHex(plaster, 1.02), shadeHex(plaster, 1.12));
+  drawIsoCourses(g, hall, 3, shadeHex(plaster, 0.7), shadeHex(plaster, 0.88));
+  drawIsoPanel(g, hall, "L", 0.18, 0.48, 0.22, 0.58, shadeHex("#6a8aa0", 0.85));
+  drawIsoPanel(g, hall, "L", 0.22, 0.44, 0.28, 0.52, "#7aa8b8");
+  drawIsoPanel(g, hall, "L", 0.28, 0.32, 0.28, 0.52, shadeHex("#3a5460", 1));
+  drawIsoPanel(g, hall, "L", 0.22, 0.44, 0.38, 0.42, shadeHex("#3a5460", 1));
+
+  drawPyramidRoof(g, 52, 60, 36, 18, 32, roofC);
+  drawIsoVolume(g, 52, 62, 36, 18, 3,
+    shadeHex(roofC, 0.55), shadeHex(roofC, 0.75), shadeHex(roofC, 0.85));
+
+  const porch = drawIsoVolume(g, 52, 78, 18, 9, 14,
+    shadeHex(plaster, 0.7), shadeHex(plaster, 0.96), shadeHex("#c9a36a", 1.05));
+  drawIsoPanel(g, porch, "R", 0.22, 0.78, 0.18, 0.95, "#5a3318");
+  drawIsoPanel(g, porch, "R", 0.32, 0.68, 0.28, 0.95, "#3d2210");
+  drawIsoPanel(g, porch, "L", 0.55, 0.82, 0.2, 0.7, shadeHex("#5a3318", 0.9));
+  drawIsoVolume(g, 40, 72, 3, 2, 18, "#8a6238", "#b08450", "#d4b078");
+  drawIsoVolume(g, 64, 72, 3, 2, 18, "#8a6238", "#b08450", "#d4b078");
+
+  g.fillStyle = "#6b3f1f";
+  g.fillRect(70, 28, 3, 14);
+  g.fillStyle = roofC;
+  fillPoly(g, [isoPt(73, 28), isoPt(82, 24), isoPt(73, 32)], shadeHex(roofC, 1.1));
+
   return im;
 }
 
 function makeTempleSprite(deityId) {
-  const im = newImage(92, 96);
+  const im = newImage(148, 176);
   const g = im.getContext("2d");
   g.imageSmoothingEnabled = false;
-  const pal = {
-    shiva: "#5b4a8a", kali: "#3a1848", ganesha: "#c45c26", lakshmi: "#d4a017",
-    saraswati: "#d8e6f2", hanuman: "#c43b3b", krishna: "#2f6fbf"
-  };
-  const accent = pal[deityId] || "#c45c26";
-  g.fillStyle = "rgba(0,0,0,0.22)";
+  const theme = TEMPLE_THEME[deityId] || TEMPLE_THEME.ganesha;
+  const stone = theme.stone;
+  const accent = theme.accent;
+
+  g.fillStyle = "rgba(0,0,0,0.3)";
   g.beginPath();
-  g.ellipse(46, 90, 34, 6, 0, 0, Math.PI * 2);
+  g.ellipse(74, 168, 56, 7, 0, 0, Math.PI * 2);
   g.fill();
-  g.fillStyle = "#c9a36a";
-  g.beginPath();
-  g.moveTo(8, 58); g.lineTo(46, 74); g.lineTo(46, 90); g.lineTo(8, 74);
-  g.closePath();
-  g.fill();
-  g.fillStyle = "#e8d2a8";
-  g.beginPath();
-  g.moveTo(84, 58); g.lineTo(46, 74); g.lineTo(46, 90); g.lineTo(84, 74);
-  g.closePath();
-  g.fill();
-  g.fillStyle = accent;
-  g.beginPath();
-  g.moveTo(46, 6); g.lineTo(78, 42); g.lineTo(46, 56); g.lineTo(14, 42);
-  g.closePath();
-  g.fill();
-  g.fillStyle = "#f2d24a";
-  g.fillRect(44, 4, 4, 14);
-  g.fillStyle = "#6b1d2a";
-  g.fillRect(40, 72, 12, 16);
-  g.fillStyle = "#8ec8e8";
-  g.fillRect(18, 64, 8, 7);
-  g.fillRect(66, 62, 8, 7);
+
+  const jagati = drawIsoVolume(g, 74, 132, 56, 28, 12,
+    shadeHex(stone, 0.62), shadeHex(stone, 0.88), shadeHex(stone, 1.08));
+  drawIsoCourses(g, jagati, 3, shadeHex(stone, 0.5), shadeHex(stone, 0.72));
+  for (let i = 0; i < 6; i++) {
+    const t = (i + 0.5) / 6;
+    drawIsoPanel(g, jagati, "L", t - 0.05, t + 0.03, 0.15, 0.85, theme.gold);
+    drawIsoPanel(g, jagati, "R", t - 0.05, t + 0.03, 0.15, 0.85, shadeHex(theme.gold, 0.85));
+  }
+
+  drawIsoVolume(g, 50, 128, 10, 5, 18, shadeHex(stone, 0.7), shadeHex(stone, 0.92), shadeHex(accent, 0.95));
+  drawShikhara(g, 50, 128, 9, 3, shadeHex(stone, 0.95), accent);
+  drawIsoVolume(g, 98, 128, 10, 5, 18, shadeHex(stone, 0.7), shadeHex(stone, 0.92), shadeHex(accent, 0.95));
+  drawShikhara(g, 98, 128, 9, 3, shadeHex(stone, 0.95), accent);
+
+  const garbha = drawIsoVolume(g, 74, 108, 30, 15, 24,
+    shadeHex(stone, 0.74), shadeHex(stone, 1.0), shadeHex(stone, 1.12));
+  drawIsoCourses(g, garbha, 4, shadeHex(stone, 0.64), shadeHex(stone, 0.86));
+  drawIsoPanel(g, garbha, "L", 0.12, 0.88, 0.08, 0.2, theme.gold);
+  drawIsoPanel(g, garbha, "R", 0.12, 0.88, 0.08, 0.2, shadeHex(theme.gold, 0.85));
+
+  const cap = drawShikhara(g, 74, 108, 28, 8, stone, accent);
+  const amalakaY = cap ? cap.cy - 4 : 42;
+  drawAmalaka(g, 74, amalakaY, 11, theme.gold);
+  drawKalasha(g, 74, amalakaY - 6, theme.gold, theme.flag);
+
+  const mandapa = drawIsoVolume(g, 74, 128, 22, 11, 18,
+    shadeHex(stone, 0.7), shadeHex(stone, 0.96), shadeHex(theme.gold, 0.95));
+  drawIsoCourses(g, mandapa, 3, shadeHex(stone, 0.6), shadeHex(stone, 0.82));
+  drawPyramidRoof(g, 74, 128, 24, 12, 16, accent);
+
+  drawIsoVolume(g, 63, 126, 3, 2, 16, "#8a6238", "#c4a060", "#e6c88a");
+  drawIsoVolume(g, 85, 126, 3, 2, 16, "#8a6238", "#c4a060", "#e6c88a");
+
+  const steps = drawIsoVolume(g, 74, 146, 14, 7, 8,
+    shadeHex(stone, 0.58), shadeHex(stone, 0.82), shadeHex(stone, 1.05));
+  drawIsoCourses(g, steps, 3, shadeHex(stone, 0.48), shadeHex(stone, 0.7));
+
+  drawIsoPanel(g, mandapa, "R", 0.18, 0.82, 0.22, 0.95, theme.door);
+  drawIsoPanel(g, mandapa, "R", 0.28, 0.72, 0.32, 0.95, shadeHex(theme.door, 0.7));
+  drawIsoPanel(g, mandapa, "L", 0.55, 0.9, 0.28, 0.85, shadeHex(theme.door, 0.85));
+  drawIsoPanel(g, mandapa, "R", 0.12, 0.88, 0.12, 0.22, theme.gold);
+
+  drawIsoPanel(g, garbha, "L", 0.28, 0.72, 0.28, 0.72, shadeHex(accent, 0.55));
+  drawIsoPanel(g, garbha, "R", 0.2, 0.55, 0.3, 0.7, shadeHex("#6a8aa0", 0.75));
+
+  drawTempleOrnament(g, deityId, 74, amalakaY - 8, mandapa);
   return im;
 }
 
 function makeDeityShrine(deityId) {
-  const im = newImage(40, 58);
+  const im = newImage(52, 76);
   const g = im.getContext("2d");
   g.imageSmoothingEnabled = false;
-  g.fillStyle = "rgba(0,0,0,0.2)";
+  const theme = TEMPLE_THEME[deityId] || TEMPLE_THEME.shiva;
+
+  g.fillStyle = "rgba(0,0,0,0.24)";
   g.beginPath();
-  g.ellipse(20, 54, 12, 3, 0, 0, Math.PI * 2);
+  g.ellipse(26, 72, 16, 3, 0, 0, Math.PI * 2);
   g.fill();
-  g.fillStyle = "#c9a36a";
-  g.fillRect(8, 40, 24, 12);
-  g.fillStyle = "#e8d2a8";
-  g.fillRect(10, 38, 20, 4);
-  const draw = {
-    shiva() {
-      g.fillStyle = "#5b4a8a";
-      g.fillRect(18, 10, 4, 28);
-      g.fillRect(10, 16, 20, 3);
-      g.fillStyle = "#f2d24a";
-      g.beginPath(); g.arc(20, 10, 5, Math.PI, 0); g.stroke();
-    },
-    kali() {
-      g.fillStyle = "#2a1038";
-      g.fillRect(16, 12, 8, 22);
-      g.fillStyle = "#c43b3b";
-      g.fillRect(10, 18, 20, 3);
-      g.fillStyle = "#f2d24a";
-      g.fillRect(18, 8, 4, 4);
-    },
-    ganesha() {
-      g.fillStyle = "#c45c26";
-      g.beginPath(); g.arc(20, 18, 8, 0, Math.PI * 2); g.fill();
-      g.fillRect(16, 24, 8, 12);
-      g.fillRect(12, 28, 4, 10);
-      g.fillStyle = "#e8d2a8";
-      g.fillRect(18, 20, 8, 3);
-    },
-    lakshmi() {
-      g.fillStyle = "#d4a017";
-      g.beginPath();
-      g.moveTo(20, 10); g.lineTo(30, 28); g.lineTo(10, 28);
-      g.closePath(); g.fill();
-      g.fillStyle = "#fff";
-      g.beginPath(); g.arc(20, 30, 5, 0, Math.PI * 2); g.fill();
-    },
-    saraswati() {
-      g.fillStyle = "#d8e6f2";
-      g.fillRect(12, 14, 16, 18);
-      g.strokeStyle = "#2f6fbf";
-      g.beginPath(); g.moveTo(8, 32); g.quadraticCurveTo(20, 8, 32, 32); g.stroke();
-    },
-    hanuman() {
-      g.fillStyle = "#c43b3b";
-      g.fillRect(18, 12, 4, 24);
-      g.fillRect(14, 32, 12, 4);
-      g.fillStyle = "#8a6a38";
-      g.fillRect(10, 20, 8, 6);
-    },
-    krishna() {
-      g.fillStyle = "#2f6fbf";
-      g.beginPath(); g.arc(20, 18, 7, 0, Math.PI * 2); g.fill();
-      g.fillRect(16, 24, 8, 12);
-      g.strokeStyle = "#f2d24a";
-      g.beginPath(); g.moveTo(10, 16); g.quadraticCurveTo(6, 8, 14, 10); g.stroke();
-    }
-  };
-  (draw[deityId] || draw.shiva)();
+
+  const base = drawIsoVolume(g, 26, 56, 16, 8, 8,
+    shadeHex(theme.stone, 0.68), shadeHex(theme.stone, 0.92), shadeHex(theme.stone, 1.08));
+  const cella = drawIsoVolume(g, 26, 42, 11, 6, 14,
+    shadeHex(theme.stone, 0.74), shadeHex(theme.stone, 1.0), shadeHex(theme.stone, 1.12));
+  drawIsoPanel(g, cella, "R", 0.2, 0.8, 0.2, 0.9, theme.door);
+  drawIsoPanel(g, cella, "R", 0.32, 0.68, 0.32, 0.78, theme.accent);
+  drawShikhara(g, 26, 42, 10, 4, theme.stone, theme.accent);
+  drawAmalaka(g, 26, 18, 6, theme.gold);
+  drawKalasha(g, 26, 14, theme.gold, theme.flag);
+  drawIsoPanel(g, base, "L", 0.2, 0.8, 0.2, 0.8, theme.gold);
   return im;
 }
 
