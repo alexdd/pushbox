@@ -127,7 +127,7 @@ function createStore(opts) {
 
   function register(body) {
     const name = String(body.name || "").trim();
-    if (!/^[\w äöüÄÖÜß'-]{2,16}$/.test(name)) return { error: "Ungültiger Yoginame (2–16 Zeichen)." };
+    if (!/^[\w äöüÄÖÜß'.-]{2,50}$/.test(name)) return { error: "Ungültiger Yoginame (2–50 Zeichen)." };
     if (findAccount(name)) return { error: "Dieser Name ist schon vergeben." };
     const password = String(body.password || "");
     if (password.length < 4 || password.length > 64) return { error: "Passwort: 4–64 Zeichen." };
@@ -147,6 +147,36 @@ function createStore(opts) {
     accounts.push(acc);
     persistAccounts();
     return { account: publicAccount(acc) };
+  }
+
+  function upsertYogaAccount(user) {
+    const name = String((user && user.username) || "").trim();
+    if (!name || name.length > 50) return null;
+    const yogaUserId = user.id;
+    let acc = accounts.find((a) => a.yogaUserId === yogaUserId);
+    if (!acc) acc = findAccount(name);
+    if (!acc) {
+      acc = {
+        id: nextAccount++,
+        name,
+        yogaUserId,
+        salt: "",
+        hash: "",
+        gender: "female",
+        asanas: [],
+        focus: "hatha",
+        createdAt: nowIso()
+      };
+      accounts.push(acc);
+    } else {
+      acc.name = name;
+      acc.yogaUserId = yogaUserId;
+      if (!acc.gender) acc.gender = "female";
+      if (!acc.focus) acc.focus = "hatha";
+      if (!acc.asanas) acc.asanas = [];
+    }
+    persistAccounts();
+    return acc;
   }
 
   function login(name, password) {
@@ -252,6 +282,7 @@ function createStore(opts) {
   return {
     register,
     login,
+    upsertYogaAccount,
     createSession,
     sessionAccount,
     publicAccount,

@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <title>Yoga Event Area — isometrisches Ashram</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%236b1d2a'/><circle cx='8' cy='8' r='5' fill='%23e08a1e'/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23151a11'/><circle cx='8' cy='8' r='5' fill='%23d4a574'/></svg>" />
 <link rel="stylesheet" href="css/game.css" />
 </head>
 <body>
@@ -30,40 +30,20 @@
 
   <section id="login">
     <div class="card">
-      <p class="kicker">PushBox Tile-Engine · 1000×1000 Tempelgelände</p>
+      <p class="kicker">Yoga-Website · Tempelgelände</p>
       <h1>ASHRAM</h1>
-      <p class="lead">Yoga Event Area. Yoginis und Yogis wandern zwischen Festivals, Tempeln und symbolischen Darstellungen der Devatas.</p>
+      <p class="lead">Dieselben Zugangsdaten wie auf der Yoga-Website. Neue Yogis werden in der Yogi-Verwaltung für das Spiel freigeschaltet.</p>
       <p id="server-meta" class="meta">Lade Welt…</p>
-      <div class="tabs">
-        <button type="button" id="tab-login" class="tab on">Anmelden</button>
-        <button type="button" id="tab-register" class="tab">Registrieren</button>
-      </div>
       <form id="login-form">
-        <label for="login-name">Yoginame</label>
-        <input id="login-name" maxlength="16" autocomplete="username" required />
+        <label for="login-name">Yoga-Benutzername</label>
+        <input id="login-name" maxlength="50" autocomplete="username" required />
         <label for="login-pass">Passwort</label>
         <input id="login-pass" type="password" maxlength="64" autocomplete="current-password" required />
         <button type="submit">Anmelden &amp; wandern</button>
       </form>
-      <form id="register-form" class="hidden">
-        <label for="reg-name">Yoginame</label>
-        <input id="reg-name" maxlength="16" autocomplete="username" required />
-        <label for="reg-pass">Passwort (mind. 4 Zeichen)</label>
-        <input id="reg-pass" type="password" maxlength="64" autocomplete="new-password" required />
-        <p class="field-label">Ich bin</p>
-        <div class="row">
-          <label class="chip"><input type="radio" name="gender" value="female" required /> Yogini</label>
-          <label class="chip"><input type="radio" name="gender" value="male" /> Yogi</label>
-        </div>
-        <label for="reg-focus">Schwerpunkt</label>
-        <select id="reg-focus"></select>
-        <p class="field-label">Lieblingsasanas</p>
-        <div id="reg-asanas" class="checks"></div>
-        <button type="submit">Registrieren &amp; eintreten</button>
-      </form>
       <p id="login-error" class="error"></p>
       <p class="hint">Klicke einen wandernden Yogi an, um privat zu chatten. Kalender: Festivals buchen und Treffen verabreden.</p>
-      <p class="back"><a href="/">← PushBox</a></p>
+      <p class="back"><a href="/publiziere/#/yoga">← Zur Yoga-Website</a></p>
     </div>
   </section>
 
@@ -106,12 +86,12 @@
     </div>
   </div>
 
-  <script src="/js/runtime.js"></script>
-  <script src="/js/Sprite.js"></script>
-  <script src="/shared/catalog.js"></script>
-  <script src="/shared/world.js"></script>
-  <script src="/zelda/js/assets.js"></script>
-  <script src="/zelda/js/ZeldaCanvas.js"></script>
-  <script src="/zelda/js/game.js"></script>
+  <script src="../js/runtime.js"></script>
+  <script src="../js/Sprite.js"></script>
+  <script src="../shared/catalog.js"></script>
+  <script src="../shared/world.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/ZeldaCanvas.js"></script>
+  <script src="js/game.js"></script>
 </body>
 </html>

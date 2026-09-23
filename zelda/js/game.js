@@ -105,9 +105,19 @@ function updateHud() {
   Hyrule.nearby = next;
 }
 
+function apiBase() {
+  const path = location.pathname;
+  const at = path.indexOf("/zelda");
+  return at > 0 ? path.slice(0, at).replace(/\/$/, "") : "";
+}
+
+function api(path) {
+  return apiBase() + path;
+}
+
 function wsUrl() {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  return proto + "//" + location.host + "/ws";
+  return proto + "//" + location.host + apiBase() + "/ws";
 }
 
 function send(msg) {
@@ -357,65 +367,50 @@ function connectAfterAuth(token) {
   ws.onerror = () => { qs("login-error").textContent = "WebSocket-Fehler."; };
 }
 
-function fillCatalogFields() {
-  const foci = YogaCatalog.FOCI;
-  const sel = qs("reg-focus");
-  sel.innerHTML = foci.map((f) => "<option value='" + f.id + "'>" + f.name + "</option>").join("");
-  qs("reg-asanas").innerHTML = YogaCatalog.ASANAS.map((a) =>
-    "<label><input type='checkbox' value='" + a.id + "'/> " + a.name + "</label>").join("");
+function basicHeader(name, password) {
+  const raw = name + ":" + password;
+  const bytes = new TextEncoder().encode(raw);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return "Basic " + btoa(bin);
+}
+
+async function enterWithBasic(basic) {
+  const res = await fetch(api("/api/yoga-login"), {
+    method: "POST",
+    headers: { Authorization: basic }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    qs("login-error").textContent = data.error || "Anmeldung fehlgeschlagen";
+    return false;
+  }
+  Hyrule.account = data.account;
+  connectAfterAuth(data.token);
+  return true;
+}
+
+function tryStoredYogaLogin() {
+  let creds = "";
+  try { creds = sessionStorage.getItem("yoga_credentials") || ""; } catch (e) { creds = ""; }
+  if (!creds) return;
+  qs("login-error").textContent = "Yoga-Konto wird übernommen…";
+  enterWithBasic("Basic " + creds).catch(() => {
+    qs("login-error").textContent = "Server nicht erreichbar.";
+  });
 }
 
 function wireAuth() {
-  qs("tab-login").onclick = () => {
-    qs("tab-login").classList.add("on");
-    qs("tab-register").classList.remove("on");
-    qs("login-form").classList.remove("hidden");
-    qs("register-form").classList.add("hidden");
-  };
-  qs("tab-register").onclick = () => {
-    qs("tab-register").classList.add("on");
-    qs("tab-login").classList.remove("on");
-    qs("register-form").classList.remove("hidden");
-    qs("login-form").classList.add("hidden");
-  };
-
   qs("login-form").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     qs("login-error").textContent = "";
     try {
-      const res = await fetch("/api/login", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: qs("login-name").value.trim(), password: qs("login-pass").value })
-      });
-      const data = await res.json();
-      if (!res.ok) { qs("login-error").textContent = data.error || "Login fehlgeschlagen"; return; }
-      Hyrule.account = data.account;
-      connectAfterAuth(data.token);
-    } catch (e) {
-      qs("login-error").textContent = "Server nicht erreichbar.";
-    }
-  });
-
-  qs("register-form").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    qs("login-error").textContent = "";
-    const gender = (qs("register-form").querySelector("input[name=gender]:checked") || {}).value;
-    const asanas = [...qs("reg-asanas").querySelectorAll("input:checked")].map((i) => i.value);
-    try {
-      const res = await fetch("/api/register", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: qs("reg-name").value.trim(),
-          password: qs("reg-pass").value,
-          gender,
-          focus: qs("reg-focus").value,
-          asanas
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) { qs("login-error").textContent = data.error || "Registrierung fehlgeschlagen"; return; }
-      Hyrule.account = data.account;
-      connectAfterAuth(data.token);
+      const ok = await enterWithBasic(basicHeader(qs("login-name").value.trim(), qs("login-pass").value));
+      if (ok) {
+        try {
+          sessionStorage.setItem("yoga_credentials", basicHeader(qs("login-name").value.trim(), qs("login-pass").value).slice(6));
+        } catch (e) { /* ignore */ }
+      }
     } catch (e) {
       qs("login-error").textContent = "Server nicht erreichbar.";
     }
@@ -525,12 +520,12 @@ function boot() {
   fitView();
   window.addEventListener("resize", fitView);
   window.addEventListener("orientationchange", () => setTimeout(fitView, 200));
-  fillCatalogFields();
   wireAuth();
   wireInput();
   startLoop();
+  tryStoredYogaLogin();
 
-  fetch("/api/health").then((r) => r.json()).then((info) => {
+  fetch(api("/api/health")).then((r) => r.json()).then((info) => {
     const st = info.world.stats || {};
     qs("server-meta").textContent =
       "Welt " + info.world.size + "×" + info.world.size +

@@ -15,8 +15,8 @@ const Catalog = require("../shared/catalog");
 const { createStore } = require("./store");
 
 const MAX_PLAYERS = 5;
-const COLORS = ["#c45c26", "#6b1d2a", "#2f6fbf", "#d4a017", "#2f8f3a"];
-const NAME_RE = /^[\w äöüÄÖÜß'-]{1,16}$/;
+const COLORS = ["#d4a574", "#5c8a55", "#c8965f", "#3d6b45", "#e0c9a0"];
+const NAME_RE = /^[\w äöüÄÖÜß'.-]{1,50}$/;
 
 function sanitizeName(name) {
   const n = String(name || "").trim();
@@ -171,6 +171,36 @@ async function buildServer(opts) {
     if (result.error) return reply.code(401).send(result);
     const token = store.createSession(result.account);
     return { token, account: result.account };
+  });
+
+  app.post("/api/yoga-login", async (req, reply) => {
+    const auth = req.headers.authorization || "";
+    if (!/^Basic\s+\S+/i.test(auth)) {
+      return reply.code(401).send({ error: "Bitte mit dem Yoga-Website-Konto anmelden." });
+    }
+    const base = (process.env.YOGA_API_BASE || "http://yoga:8001").replace(/\/$/, "");
+    let user;
+    try {
+      const res = await fetch(base + "/api/v1/auth/me", { headers: { Authorization: auth } });
+      if (res.status === 401) {
+        return reply.code(401).send({ error: "Yoga-Name oder Passwort stimmt nicht." });
+      }
+      if (!res.ok) {
+        return reply.code(502).send({ error: "Yoga-Anmeldung gerade nicht erreichbar." });
+      }
+      user = await res.json();
+    } catch (err) {
+      return reply.code(502).send({ error: "Yoga-Anmeldung gerade nicht erreichbar." });
+    }
+    if (user.ashram_enabled === false) {
+      return reply.code(403).send({
+        error: "Dieses Konto ist nicht für das Ashram-Spiel freigeschaltet. Das geht in der Yogi-Verwaltung."
+      });
+    }
+    const account = store.upsertYogaAccount(user);
+    if (!account) return reply.code(400).send({ error: "Ungültiger Yoginame." });
+    const token = store.createSession(account);
+    return { token, account: store.publicAccount(account) };
   });
 
   app.get("/api/me", async (req, reply) => {
@@ -359,7 +389,10 @@ async function buildServer(opts) {
 async function main() {
   const port = Number(process.env.PORT || 3000);
   const host = process.env.HOST || "0.0.0.0";
-  const app = await buildServer({ logger: true });
+  const app = await buildServer({
+    logger: true,
+    dataDir: process.env.DATA_DIR || undefined
+  });
   await app.listen({ port, host });
   app.log.info("Yoga Event Area at http://" + host + ":" + port + "/zelda/");
 }
