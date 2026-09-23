@@ -313,8 +313,10 @@ class Sprite {
     y += this.offsetY;
     const frameX = (xframe >> this.scanHeight) * this.swidth;
     const frameY = (xframe & this.scanMask) * this.sheight;
+    const clip = g.captureClip();
     g.setClip(x, y, this.swidth, this.sheight);
     g.drawImage(this.image, x - frameX, y - frameY, Graphics.TOP | Graphics.LEFT);
+    g.restoreClip(clip);
   }
 }
 

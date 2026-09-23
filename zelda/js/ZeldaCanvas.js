@@ -268,8 +268,16 @@ class ZeldaCanvas {
     }
   }
 
+  cullRadius() {
+    const tilesX = Math.ceil(this.viewW / (ZeldaCanvas.TILE_DX >> 1));
+    const tilesY = Math.ceil(this.viewH / (ZeldaCanvas.TILE_DY >> 1));
+    // Temples rise ~160px above their footprint, so the cull box has to
+    // reach past the screen edge or roofs vanish while walking.
+    return tilesX + tilesY + 18;
+  }
+
   gatherVisible(cx, cy) {
-    const r = 28;
+    const r = this.cullRadius();
     const seen = new Set();
     const out = [];
     const x0 = (cx - r) >> 3, x1 = (cx + r) >> 3;
@@ -344,10 +352,29 @@ class ZeldaCanvas {
     for (let i = 0; i < world.houses.length; i++) {
       const h = world.houses[i];
       const img = assets.houses[h.roof % 3];
-      const p = new Prop("house", h.x, h.y, img, h.w, h.h, -20, -58);
+      const p = new Prop("house", h.x, h.y, img, h.w, h.h, -33, -97);
       p.place(this);
       this.props.push(p);
       this.addToHash(p);
+    }
+    const temples = world.temples || [];
+    for (let i = 0; i < temples.length; i++) {
+      const t = temples[i];
+      const img = (assets.temples && assets.temples[t.deity]) || assets.houses[0];
+      const p = new Prop("temple", t.tx, t.ty, img, t.w || 3, t.h || 3, -50, -156);
+      p.deity = t.deity;
+      p.label = t.name;
+      p.place(this);
+      this.props.push(p);
+      this.addToHash(p);
+      if (assets.shrines && assets.shrines[t.deity]) {
+        const shrine = new Prop("shrine", t.x + 2, t.y + 1, assets.shrines[t.deity], 1, 1, -18, -68);
+        shrine.deity = t.deity;
+        shrine.label = t.deity;
+        shrine.place(this);
+        this.props.push(shrine);
+        this.addToHash(shrine);
+      }
     }
 
     this.minimap = makeMinimap(world);
@@ -358,10 +385,11 @@ class ZeldaCanvas {
   spawnLocal(info) {
     const o = new Sprite(0);
     o.init(Sprite.TYPE_LION);
-    o.setSpriteImage(this.assets.players[info.slot % this.assets.players.length], Sprite.TYPE_LION);
+    o.setSpriteImage(this.yogiSheet(info), Sprite.TYPE_LION);
     o.isPlayer = true;
     o.name = info.name;
     o.color = info.color;
+    o.gender = info.gender || "male";
     o.pid = info.id;
     o.setTile(info.tx, info.ty, info.dir == null ? 2 : info.dir);
     this.player = o;
@@ -383,8 +411,11 @@ class ZeldaCanvas {
     }
     o.name = info.name;
     o.color = info.color;
+    o.gender = info.gender || "male";
     o.pid = info.id;
-    o.setSpriteImage(this.assets.players[info.slot % this.assets.players.length], Sprite.TYPE_LION);
+    o.asanas = info.asanas || [];
+    o.focus = info.focus || "hatha";
+    o.setSpriteImage(this.yogiSheet(info), Sprite.TYPE_LION);
     if (info.x || info.y) {
       o.x = info.x;
       o.y = info.y;
@@ -408,6 +439,26 @@ class ZeldaCanvas {
       o.frames = null;
       o.frame = 0;
     }
+  }
+
+  yogiSheet(info) {
+    const gender = info.gender === "female" ? "female" : "male";
+    const pack = (this.assets.yogis && this.assets.yogis[gender]) || this.assets.players;
+    return pack[(info.slot || 0) % pack.length];
+  }
+
+  pickYogiAt(screenX, screenY) {
+    const wx = screenX + this.camX;
+    const wy = screenY + this.camY;
+    let best = null;
+    for (const o of this.remotes.values()) {
+      const x = o.x + o.offsetX;
+      const y = o.y + o.offsetY;
+      if (wx >= x - 4 && wx <= x + o.swidth + 4 && wy >= y - 8 && wy <= y + o.sheight + 4) {
+        best = o;
+      }
+    }
+    return best;
   }
 
   removeRemote(id) {
@@ -443,7 +494,6 @@ class ZeldaCanvas {
       this.lastHashCX = this.player.tileX;
       this.lastHashCY = this.player.tileY;
     }
-    this.rebuildSorted();
   }
 
   step() {
@@ -474,7 +524,6 @@ class ZeldaCanvas {
   }
 
   paintGame(g) {
-    let sorted = this.sorted;
     this.paintTexture(g);
     this.setCamGrid();
     this.setSlide();
@@ -498,23 +547,30 @@ class ZeldaCanvas {
           if (tile === water) continue;
         }
 
-      g.translate(-this.camX, -this.camY);
-      while (sorted != null && sorted.tileRow <= this.row && sorted.tileOffset > 0) {
-        if (ZeldaCanvas.isOnScreen(this, sorted)) sorted.paint(g);
-        sorted = sorted.next;
-      }
-      g.translate(this.camX, this.camY);
-
-      g.setClip(0, 0, this.viewW, this.viewH);
-      g.translate(-this.camX, -this.camY);
-      while (sorted != null && sorted.tileRow <= this.row) {
-        if (ZeldaCanvas.isOnScreen(this, sorted)) sorted.paint(g);
-        sorted = sorted.next;
-      }
-      g.translate(this.camX, this.camY);
       this.nextXY();
     }
 
+    g.setClip(0, 0, this.viewW, this.viewH);
+    this.paintSprites(g);
+  }
+
+  /* Ground stays on the 2005 diamond walker. Sprites are drawn afterwards,
+     back to front. Interleaving them into the tile rows clipped tall huts
+     and, once the yogi setClip ran, every sprite painted after them. */
+  paintSprites(g) {
+    if (this.player) this.gatherVisible(this.player.tileX, this.player.tileY);
+    const draw = [];
+    for (let i = 0; i < this.visibleProps.length; i++) {
+      const p = this.visibleProps[i];
+      if (ZeldaCanvas.isOnScreen(this, p)) draw.push(p);
+    }
+    if (this.player) draw.push(this.player);
+    for (const remote of this.remotes.values()) draw.push(remote);
+    draw.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    g.setClip(0, 0, this.viewW, this.viewH);
+    g.translate(-this.camX, -this.camY);
+    for (let i = 0; i < draw.length; i++) draw[i].paint(g);
+    g.translate(this.camX, this.camY);
     g.setClip(0, 0, this.viewW, this.viewH);
   }
 
@@ -532,7 +588,7 @@ class ZeldaCanvas {
     const people = [this.player, ...this.remotes.values()].filter(Boolean);
     for (let i = 0; i < people.length; i++) {
       const o = people[i];
-      const label = o.name || "Held";
+      const label = o.name || "Yogi";
       ctx.font = "bold 10px monospace";
       const w = ctx.measureText(label).width + 8;
       const lx = o.x - (w >> 1);
@@ -546,6 +602,16 @@ class ZeldaCanvas {
         ctx.font = "16px sans-serif";
         ctx.fillText(em.icon, o.x - 6, ly - 4);
       }
+    }
+    for (let i = 0; i < this.visibleProps.length; i++) {
+      const p = this.visibleProps[i];
+      if (p.kind !== "temple" || !p.label) continue;
+      ctx.font = "bold 9px monospace";
+      const tw = ctx.measureText(p.label).width + 6;
+      ctx.fillStyle = "rgba(80,30,10,0.7)";
+      ctx.fillRect(p.x - (tw >> 1), p.y + p.offsetY - 10, tw, 11);
+      ctx.fillStyle = "#f2d24a";
+      ctx.fillText(p.label, p.x - (tw >> 1) + 3, p.y + p.offsetY - 1);
     }
     ctx.restore();
 

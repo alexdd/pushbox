@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
-<title>Hyrule — isometrischer MMORPG-Prototyp</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23142e1c'/><polygon points='8,2 14,8 8,14 2,8' fill='%233d9a3a'/></svg>" />
+<title>Yoga Event Area — isometrisches Ashram</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23151a11'/><circle cx='8' cy='8' r='5' fill='%23d4a574'/></svg>" />
 <link rel="stylesheet" href="css/game.css" />
 </head>
 <body>
@@ -14,29 +14,36 @@
 
   <header id="hud" class="hidden">
     <div class="hud-left">
-      <strong id="hud-place">Hateno</strong>
+      <strong id="hud-place">Kailash Ashram</strong>
       <span>Kachel <em id="hud-pos">500,500</em></span>
     </div>
+    <nav id="menu-bar">
+      <button type="button" data-panel="calendar">Kalender</button>
+      <button type="button" data-panel="meet">Treffen</button>
+      <button type="button" data-panel="profile">Profil</button>
+    </nav>
     <div class="hud-right">
       <span id="status">…</span>
-      <span class="online">Spieler <em id="hud-online">1/5</em></span>
+      <span class="online">Yogis <em id="hud-online">1/5</em></span>
     </div>
   </header>
 
   <section id="login">
     <div class="card">
-      <p class="kicker">PushBox Tile-Engine · 1000×1000</p>
-      <h1>HYRULE</h1>
-      <p class="lead">Isometrischer Zelda-Klon. Bis zu fünf Helden wandern gemeinsam durch Dörfer, Wälder, Flüsse und Brücken.</p>
+      <p class="kicker">Yoga-Website · Tempelgelände</p>
+      <h1>ASHRAM</h1>
+      <p class="lead">Dieselben Zugangsdaten wie auf der Yoga-Website. Neue Yogis werden in der Yogi-Verwaltung für das Spiel freigeschaltet.</p>
       <p id="server-meta" class="meta">Lade Welt…</p>
-      <form id="join-form">
-        <label for="name">Heldname</label>
-        <input id="name" name="name" maxlength="16" autocomplete="nickname" placeholder="Link" required />
-        <button type="submit">Welt betreten</button>
-        <p id="login-error" class="error"></p>
+      <form id="login-form">
+        <label for="login-name">Yoga-Benutzername</label>
+        <input id="login-name" maxlength="50" autocomplete="username" required />
+        <label for="login-pass">Passwort</label>
+        <input id="login-pass" type="password" maxlength="64" autocomplete="current-password" required />
+        <button type="submit">Anmelden &amp; wandern</button>
       </form>
-      <p class="hint">Tastatur: Pfeile / WASD · E winken · Enter chat. Smartphone: Steuerkreuz.</p>
-      <p class="back"><a href="/">← zurück zu PushBox</a></p>
+      <p id="login-error" class="error"></p>
+      <p class="hint">Klicke einen wandernden Yogi an, um privat zu chatten. Kalender: Festivals buchen und Treffen verabreden.</p>
+      <p class="back"><a href="/publiziere/#/yoga">← Zur Yoga-Website</a></p>
     </div>
   </section>
 
@@ -47,22 +54,44 @@
       <button id="pad-right" aria-label="Osten">▶</button>
       <button id="pad-down" aria-label="Süden">▼</button>
     </div>
-    <button id="pad-act" aria-label="Winken">👋</button>
+    <button id="pad-act" aria-label="Namaste">🙏</button>
   </div>
 
   <aside id="chat" class="hidden">
     <div id="chat-log"></div>
     <form id="chat-form">
-      <input id="chat-input" maxlength="80" placeholder="Nachricht…" autocomplete="off" />
+      <input id="chat-input" maxlength="120" placeholder="Ashram-Chat…" autocomplete="off" />
       <button type="submit">OK</button>
     </form>
   </aside>
 
-  <script src="/js/runtime.js"></script>
-  <script src="/js/Sprite.js"></script>
-  <script src="/shared/world.js"></script>
-  <script src="/zelda/js/assets.js"></script>
-  <script src="/zelda/js/ZeldaCanvas.js"></script>
-  <script src="/zelda/js/game.js"></script>
+  <div id="overlay" class="hidden">
+    <div class="sheet">
+      <header class="sheet-head">
+        <h2 id="sheet-title">Menü</h2>
+        <button type="button" id="sheet-close">✕</button>
+      </header>
+      <div id="panel-calendar" class="panel"></div>
+      <div id="panel-festival" class="panel hidden"></div>
+      <div id="panel-meet" class="panel hidden"></div>
+      <div id="panel-profile" class="panel hidden"></div>
+      <div id="panel-whisper" class="panel hidden">
+        <p id="whisper-meta" class="meta"></p>
+        <div id="whisper-log"></div>
+        <form id="whisper-form">
+          <input id="whisper-input" maxlength="160" placeholder="Private Nachricht…" autocomplete="off" />
+          <button type="submit">Senden</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/runtime.js"></script>
+  <script src="../js/Sprite.js"></script>
+  <script src="../shared/catalog.js"></script>
+  <script src="../shared/world.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/ZeldaCanvas.js"></script>
+  <script src="js/game.js"></script>
 </body>
 </html>

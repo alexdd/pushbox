@@ -1,13 +1,14 @@
 /*
- * Headless checks for the Hyrule prototype:
- *   1. 1000×1000 world has rivers, bridges, houses, trees, walkable spawn
- *   2. ZeldaCanvas loads the world and the player can take a step
- *   3. Fastify + WebSocket: 5 players join, a 6th is rejected, moves broadcast
+ * Headless checks for the Yoga Event Area:
+ *   1. 1000×1000 world has rivers, temples, deities, walkable spawn
+ *   2. ZeldaCanvas loads and the yogi can take a step
+ *   3. Fastify: 5 online, 6th rejected; register/login; whisper; festival join
  */
 "use strict";
 
 const assert = require("assert");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const vm = require("vm");
 const { generateWorld, isWalkable, TILE } = require("../shared/world");
@@ -15,16 +16,17 @@ const { buildServer, MAX_PLAYERS } = require("../server/index");
 
 function section(name) { console.log("  · " + name); }
 
-// ---------------------------------------------------------------------------
 section("world generator");
 const world = generateWorld(1998, 1000);
 assert.strictEqual(world.size, 1000);
 assert.strictEqual(world.tiles.length, 1000 * 1000);
 assert.ok(world.stats.water > 5000, "rivers should cover many water tiles");
 assert.ok(world.stats.bridges > 20, "roads must cross rivers on bridges");
-assert.ok(world.stats.houses >= 8, "villages should contain houses");
+assert.ok(world.stats.houses >= 8, "ashrams should contain huts");
 assert.ok(world.stats.trees > 200, "forests should plant trees");
-assert.ok(world.stats.villages === 5);
+assert.ok(world.temples.length >= 7, "seven deity temples");
+const deities = world.temples.map((t) => t.deity);
+["shiva", "kali", "ganesha"].forEach((d) => assert.ok(deities.includes(d), d + " temple"));
 assert.ok(isWalkable(world, world.spawn.x, world.spawn.y), "spawn must be walkable");
 
 let walkableNear = 0;
@@ -33,13 +35,13 @@ for (let y = world.spawn.y - 4; y <= world.spawn.y + 4; y++) {
     if (isWalkable(world, x, y)) walkableNear++;
   }
 }
-assert.ok(walkableNear >= 10, "Hateno plaza should be walkable");
+assert.ok(walkableNear >= 10, "ashram plaza should be walkable");
 
 const world2 = generateWorld(1998, 1000);
 assert.deepStrictEqual(Buffer.from(world.tiles), Buffer.from(world2.tiles), "same seed is deterministic");
 assert.strictEqual(world.trees.length, world2.trees.length);
+assert.strictEqual(world.temples.length, world2.temples.length);
 
-// ---------------------------------------------------------------------------
 section("tile engine (1000×1000)");
 function stubCtx() {
   return new Proxy({}, {
@@ -71,7 +73,8 @@ const sandbox = {
   document: documentStub,
   requestAnimationFrame() {},
   console,
-  ZeldaWorld: require("../shared/world")
+  ZeldaWorld: require("../shared/world"),
+  YogaCatalog: require("../shared/catalog")
 };
 vm.createContext(sandbox);
 const load = (rel) => {
@@ -90,36 +93,101 @@ const engineOut = vm.runInContext(`
   const assets = buildHyruleAssets();
   const world = ZeldaWorld.generateWorld(1998, 1000);
   engine.loadWorld(world, assets);
-  engine.spawnLocal({ id: 1, name: "Test", slot: 0, color: "#2f8f3a", tx: world.spawn.x, ty: world.spawn.y, dir: 2 });
+  engine.spawnLocal({ id: 1, name: "Test", slot: 0, color: "#c45c26", gender: "female", tx: world.spawn.x, ty: world.spawn.y, dir: 2 });
   engine.state = ZeldaCanvas.STATE_GAME;
   const before = { x: engine.player.tileX, y: engine.player.tileY };
   engine.RIGHT = true;
   for (let i = 0; i < 20; i++) engine.step();
+  engine.resize(480, 320);
+  engine.setCamera(engine.player.x, engine.player.y);
+  engine.g.setClip(0, 0, engine.viewW, engine.viewH);
+  engine.player.paint(engine.g);
+  const clipHeld = engine.g.clipW >= engine.viewW && engine.g.clipH >= engine.viewH;
+  const painted = new Set();
+  const origPaint = Prop.prototype.paint;
+  Prop.prototype.paint = function (g) {
+    painted.add(this);
+    return origPaint.call(this, g);
+  };
+  engine.paint();
+  Prop.prototype.paint = origPaint;
+  let missing = 0;
+  let onScreen = 0;
+  for (let i = 0; i < engine.props.length; i++) {
+    const p = engine.props[i];
+    if (!ZeldaCanvas.isOnScreen(engine, p)) continue;
+    onScreen++;
+    if (!painted.has(p)) missing++;
+  }
   engine.paint();
   ({
     size: engine.width_map,
     objects: engine.props.length,
+    temples: engine.props.filter((p) => p.kind === "temple").length,
     moved: engine.player.tileX !== before.x || engine.player.tileY !== before.y || engine.player.state === Sprite.STATE_MOVING,
     spawn: before,
-    tile: engine.getTile(before.x, before.y)
+    tile: engine.getTile(before.x, before.y),
+    clipHeld,
+    missing,
+    onScreen
   });
 `, sandbox);
 
 assert.strictEqual(engineOut.size, 1000);
-assert.ok(engineOut.objects > 200, "props (trees+houses) loaded");
-assert.ok(engineOut.moved, "player should walk on the plaza");
+assert.ok(engineOut.objects > 200, "props (trees+huts+temples) loaded");
+assert.strictEqual(engineOut.clipHeld, true, "yogi sprite clip must not stick");
+assert.ok(engineOut.onScreen > 0, "some trees or huts should be on screen");
+assert.strictEqual(engineOut.missing, 0, "on-screen trees and huts must all be painted");
+assert.ok(engineOut.temples >= 5, "temple props placed");
+assert.ok(engineOut.moved, "yogi should walk on the plaza");
 assert.ok(engineOut.tile === TILE.PATH || engineOut.tile === TILE.GRASS || engineOut.tile === TILE.FLOWER);
 
-// ---------------------------------------------------------------------------
-section("fastify + websocket (5 players)");
+section("fastify + websocket + auth");
 (async () => {
-  const app = await buildServer({ logger: false, seed: 1998 });
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "yoga-"));
+  const app = await buildServer({ logger: false, seed: 1998, dataDir });
   await app.listen({ port: 0, host: "127.0.0.1" });
   const port = app.server.address().port;
   const health = await fetch("http://127.0.0.1:" + port + "/api/health").then((r) => r.json());
   assert.strictEqual(health.ok, true);
   assert.strictEqual(health.world.size, 1000);
+  assert.ok((health.world.temples || []).length >= 7);
   assert.strictEqual(health.max, MAX_PLAYERS);
+
+  const suffix = String(Date.now() % 100000);
+  const reg = await fetch("http://127.0.0.1:" + port + "/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Mira" + suffix,
+      password: "om1234",
+      gender: "female",
+      focus: "bhakti",
+      asanas: ["padma", "surya"]
+    })
+  }).then((r) => r.json());
+  assert.ok(reg.token, "register returns token");
+  assert.strictEqual(reg.account.gender, "female");
+
+  const login = await fetch("http://127.0.0.1:" + port + "/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Mira" + suffix, password: "om1234" })
+  }).then((r) => r.json());
+  assert.ok(login.token);
+
+  const cal = await fetch("http://127.0.0.1:" + port + "/api/calendar", {
+    headers: { Authorization: "Bearer " + login.token }
+  }).then((r) => r.json());
+  assert.ok(cal.festivals.length >= 5, "calendar has temple festivals");
+
+  const joinedFest = await fetch("http://127.0.0.1:" + port + "/api/festivals/" + cal.festivals[0].id + "/join", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + login.token, "Content-Type": "application/json" },
+    body: JSON.stringify({ asanas: ["padma"], focus: "meditation", booked: ["dawn"] })
+  }).then((r) => r.json());
+  assert.ok(joinedFest.festival.mine);
+  assert.ok(joinedFest.festival.mine.booked.indexOf("dawn") >= 0);
 
   function openPlayer(name) {
     return new Promise((resolve, reject) => {
@@ -141,9 +209,33 @@ section("fastify + websocket (5 players)");
     });
   }
 
+  function openAuth(token) {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket("ws://127.0.0.1:" + port + "/ws");
+      const inbox = [];
+      ws.addEventListener("message", (ev) => inbox.push(JSON.parse(ev.data)));
+      ws.addEventListener("open", () => ws.send(JSON.stringify({ t: "auth", token })));
+      ws.addEventListener("error", reject);
+      const start = Date.now();
+      const wait = () => {
+        const welcome = inbox.find((m) => m.t === "welcome" || m.t === "error");
+        if (welcome) return resolve({ ws, inbox, welcome });
+        if (Date.now() - start > 4000) return reject(new Error("auth timeout"));
+        setTimeout(wait, 20);
+      };
+      wait();
+    });
+  }
+
   const sessions = [];
-  for (let i = 0; i < 5; i++) {
-    const s = await openPlayer("Held" + (i + 1));
+  const authed = await openAuth(login.token);
+  assert.strictEqual(authed.welcome.t, "welcome");
+  assert.strictEqual(authed.welcome.player.gender, "female");
+  assert.ok(authed.welcome.calendar.length >= 5);
+  sessions.push(authed);
+
+  for (let i = 0; i < 4; i++) {
+    const s = await openPlayer("Yogi" + (i + 1));
     assert.strictEqual(s.welcome.t, "welcome", "player " + (i + 1) + " should join");
     sessions.push(s);
   }
@@ -160,7 +252,7 @@ section("fastify + websocket (5 players)");
     t: "move", tx: destX, ty: destY, x: 10, y: 20, dir: 1, moving: true
   }));
 
-  const sawMove = await new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     const start = Date.now();
     const poll = () => {
       if (b.inbox.some((m) => m.t === "move" && m.player.id === a.welcome.player.id && m.player.tx === destX))
@@ -170,14 +262,13 @@ section("fastify + websocket (5 players)");
     };
     poll();
   });
-  assert.ok(sawMove);
 
-  a.ws.send(JSON.stringify({ t: "say", text: "Hallo Hyrule" }));
+  a.ws.send(JSON.stringify({ t: "whisper", to: b.welcome.player.id, text: "Namaste, gehen wir zum Shiva-Festival?" }));
   await new Promise((resolve, reject) => {
     const start = Date.now();
     const poll = () => {
-      if (b.inbox.some((m) => m.t === "say" && m.text === "Hallo Hyrule")) return resolve();
-      if (Date.now() - start > 4000) return reject(new Error("chat was not broadcast"));
+      if (b.inbox.some((m) => m.t === "whisper" && m.text.indexOf("Shiva") >= 0)) return resolve();
+      if (Date.now() - start > 4000) return reject(new Error("whisper was not delivered"));
       setTimeout(poll, 20);
     };
     poll();
@@ -188,6 +279,7 @@ section("fastify + websocket (5 players)");
 
   console.log("zelda_test: ok");
   console.log("  world", world.stats);
+  console.log("  temples", world.temples.map((t) => t.deity + "@" + t.x + "," + t.y).join(" "));
   console.log("  engine moved from", engineOut.spawn);
 })().catch((err) => {
   console.error(err);

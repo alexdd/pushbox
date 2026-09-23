@@ -3,7 +3,7 @@
  * All rights reserved.
  *
  * Deterministic 1000×1000 overworld shared by the Fastify server and the
- * HTML5 client. Same seed → identical rivers, bridges, roads, villages,
+ * HTML5 client. Same seed → identical rivers, bridges, roads, temples,
  * houses and trees, so the server can validate walks without sending a
  * megabyte tile blob.
  */
@@ -14,6 +14,10 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   root.ZeldaWorld = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
+
+  const Catalog = (typeof YogaCatalog !== "undefined")
+    ? YogaCatalog
+    : (typeof require === "function" ? require("./catalog") : null);
 
   const SIZE = 1000;
   const DEFAULT_SEED = 1998;
@@ -39,11 +43,15 @@
   };
 
   const VILLAGES = [
-    { name: "Hateno", x: 500, y: 500 },
-    { name: "Kakariko", x: 220, y: 210 },
-    { name: "Rito", x: 790, y: 240 },
-    { name: "Goron", x: 200, y: 780 },
-    { name: "Zora", x: 820, y: 800 }
+    { name: "Kailash Ashram", x: 500, y: 500, deity: "shiva" },
+    { name: "Kalighat Mandir", x: 220, y: 210, deity: "kali" },
+    { name: "Ganapati Mandir", x: 790, y: 240, deity: "ganesha" },
+    { name: "Padma Ashram", x: 200, y: 780, deity: "lakshmi" },
+    { name: "Vani Mandir", x: 820, y: 800, deity: "saraswati" }
+  ];
+  const EXTRA_DEITIES = [
+    { deity: "hanuman", name: "Anjaneya Mandir" },
+    { deity: "krishna", name: "Vrindavan Kunj" }
   ];
 
   const SPAWN_OFFSETS = [
@@ -177,6 +185,11 @@
     }
     stampDisk(world, cx, cy, 3, TILE.PATH);
 
+    const templeFoot = { x: cx - 1, y: cy - 3, w: 3, h: 3 };
+    if (canPlaceHouse(world, templeFoot.x, templeFoot.y, templeFoot.w, templeFoot.h)) {
+      occupyHouse(world, templeFoot);
+    }
+
     const houses = [];
     const spots = [
       [cx - 7, cy - 6], [cx + 5, cy - 6],
@@ -221,7 +234,7 @@
     for (let c = 0; c < clusters; c++) {
       const cx = 30 + ((rng() * (world.size - 60)) | 0);
       const cy = 30 + ((rng() * (world.size - 60)) | 0);
-      if (nearVillage(cx, cy, 36)) continue;
+      if (nearVillage(cx, cy, 36, world)) continue;
       const n = 18 + ((rng() * 28) | 0);
       for (let i = 0; i < n; i++) {
         const tx = cx + ((rng() * 22 - 11) | 0);
@@ -236,7 +249,7 @@
       const tx = 8 + ((rng() * (world.size - 16)) | 0);
       const ty = 8 + ((rng() * (world.size - 16)) | 0);
       if (!canPlant(world, tx, ty)) continue;
-      if (nearVillage(tx, ty, 16)) continue;
+      if (nearVillage(tx, ty, 16, world)) continue;
       markBlocked(world, tx, ty);
       trees.push({ x: tx, y: ty, variant: rng() < 0.4 ? 1 : 0 });
     }
@@ -251,12 +264,33 @@
     return true;
   }
 
-  function nearVillage(x, y, radius) {
-    for (let i = 0; i < VILLAGES.length; i++) {
-      const v = VILLAGES[i];
+  function templeList(world) {
+    return (world && world.temples && world.temples.length) ? world.temples : VILLAGES;
+  }
+
+  function nearVillage(x, y, radius, world) {
+    const list = templeList(world);
+    for (let i = 0; i < list.length; i++) {
+      const v = list[i];
       if (Math.abs(v.x - x) <= radius && Math.abs(v.y - y) <= radius) return true;
     }
     return false;
+  }
+
+  function makeTemple(site) {
+    const deity = site.deity || "shiva";
+    const named = (Catalog && Catalog.TEMPLE_NAMES && Catalog.TEMPLE_NAMES[deity]) || site.name;
+    return {
+      id: deity + "-" + site.x + "-" + site.y,
+      name: site.name || named,
+      deity,
+      x: site.x,
+      y: site.y,
+      tx: site.x - 1,
+      ty: site.y - 3,
+      w: 3,
+      h: 3
+    };
   }
 
   function plantVillageGrove(world, village, trees) {
@@ -301,7 +335,7 @@
       const y = 6 + ((rng() * (world.size - 12)) | 0);
       if (getTile(world, x, y) !== TILE.GRASS) continue;
       if (world.blocked.has(x + "," + y)) continue;
-      if (nearVillage(x, y, 14)) continue;
+      if (nearVillage(x, y, 14, world)) continue;
       setTile(world, x, y, TILE.WALL);
     }
     for (let i = 0; i < 2200; i++) {
@@ -380,6 +414,23 @@
     world.tiles.fill(TILE.GRASS);
     borderWall(world);
 
+    const temples = VILLAGES.map(makeTemple);
+    for (let e = 0; e < EXTRA_DEITIES.length; e++) {
+      for (let tries = 0; tries < 50; tries++) {
+        const x = 90 + ((rng() * (size - 180)) | 0);
+        const y = 90 + ((rng() * (size - 180)) | 0);
+        if (nearVillage(x, y, 140, { temples })) continue;
+        temples.push(makeTemple({
+          name: EXTRA_DEITIES[e].name,
+          deity: EXTRA_DEITIES[e].deity,
+          x, y
+        }));
+        break;
+      }
+    }
+    world.temples = temples;
+    world.villages = temples.map((t) => ({ name: t.name, x: t.x, y: t.y, deity: t.deity }));
+
     carveRiver(world, rng, 180, 8, Math.PI * 0.55, size + 80, 2);
     carveRiver(world, rng, 8, 420, 0.12, size + 40, 2);
     carveRiver(world, rng, 640, 8, Math.PI * 0.72, size, 1);
@@ -422,7 +473,8 @@
       paths: counts.path,
       trees: world.trees.length,
       houses: world.houses.length,
-      villages: world.villages.length
+      villages: world.villages.length,
+      temples: (world.temples || []).length
     };
     return world;
   }
@@ -433,6 +485,9 @@
       size: world.size,
       spawn: world.spawn,
       villages: world.villages,
+      temples: (world.temples || []).map((t) => ({
+        id: t.id, name: t.name, deity: t.deity, x: t.x, y: t.y, tx: t.tx, ty: t.ty, w: t.w, h: t.h
+      })),
       stats: world.stats
     };
   }
@@ -443,6 +498,7 @@
     TILE,
     VILLAGES,
     SPAWN_OFFSETS,
+    makeTemple,
     generateWorld,
     getTile,
     setTile,
