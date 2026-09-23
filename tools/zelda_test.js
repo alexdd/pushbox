@@ -98,6 +98,27 @@ const engineOut = vm.runInContext(`
   const before = { x: engine.player.tileX, y: engine.player.tileY };
   engine.RIGHT = true;
   for (let i = 0; i < 20; i++) engine.step();
+  engine.resize(480, 320);
+  engine.setCamera(engine.player.x, engine.player.y);
+  engine.g.setClip(0, 0, engine.viewW, engine.viewH);
+  engine.player.paint(engine.g);
+  const clipHeld = engine.g.clipW >= engine.viewW && engine.g.clipH >= engine.viewH;
+  const painted = new Set();
+  const origPaint = Prop.prototype.paint;
+  Prop.prototype.paint = function (g) {
+    painted.add(this);
+    return origPaint.call(this, g);
+  };
+  engine.paint();
+  Prop.prototype.paint = origPaint;
+  let missing = 0;
+  let onScreen = 0;
+  for (let i = 0; i < engine.props.length; i++) {
+    const p = engine.props[i];
+    if (!ZeldaCanvas.isOnScreen(engine, p)) continue;
+    onScreen++;
+    if (!painted.has(p)) missing++;
+  }
   engine.paint();
   ({
     size: engine.width_map,
@@ -105,12 +126,18 @@ const engineOut = vm.runInContext(`
     temples: engine.props.filter((p) => p.kind === "temple").length,
     moved: engine.player.tileX !== before.x || engine.player.tileY !== before.y || engine.player.state === Sprite.STATE_MOVING,
     spawn: before,
-    tile: engine.getTile(before.x, before.y)
+    tile: engine.getTile(before.x, before.y),
+    clipHeld,
+    missing,
+    onScreen
   });
 `, sandbox);
 
 assert.strictEqual(engineOut.size, 1000);
 assert.ok(engineOut.objects > 200, "props (trees+huts+temples) loaded");
+assert.strictEqual(engineOut.clipHeld, true, "yogi sprite clip must not stick");
+assert.ok(engineOut.onScreen > 0, "some trees or huts should be on screen");
+assert.strictEqual(engineOut.missing, 0, "on-screen trees and huts must all be painted");
 assert.ok(engineOut.temples >= 5, "temple props placed");
 assert.ok(engineOut.moved, "yogi should walk on the plaza");
 assert.ok(engineOut.tile === TILE.PATH || engineOut.tile === TILE.GRASS || engineOut.tile === TILE.FLOWER);

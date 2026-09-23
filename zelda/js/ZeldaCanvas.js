@@ -268,8 +268,16 @@ class ZeldaCanvas {
     }
   }
 
+  cullRadius() {
+    const tilesX = Math.ceil(this.viewW / (ZeldaCanvas.TILE_DX >> 1));
+    const tilesY = Math.ceil(this.viewH / (ZeldaCanvas.TILE_DY >> 1));
+    // Temples rise ~160px above their footprint, so the cull box has to
+    // reach past the screen edge or roofs vanish while walking.
+    return tilesX + tilesY + 18;
+  }
+
   gatherVisible(cx, cy) {
-    const r = 28;
+    const r = this.cullRadius();
     const seen = new Set();
     const out = [];
     const x0 = (cx - r) >> 3, x1 = (cx + r) >> 3;
@@ -365,6 +373,7 @@ class ZeldaCanvas {
         shrine.label = t.deity;
         shrine.place(this);
         this.props.push(shrine);
+        this.addToHash(shrine);
       }
     }
 
@@ -485,7 +494,6 @@ class ZeldaCanvas {
       this.lastHashCX = this.player.tileX;
       this.lastHashCY = this.player.tileY;
     }
-    this.rebuildSorted();
   }
 
   step() {
@@ -516,7 +524,6 @@ class ZeldaCanvas {
   }
 
   paintGame(g) {
-    let sorted = this.sorted;
     this.paintTexture(g);
     this.setCamGrid();
     this.setSlide();
@@ -540,23 +547,30 @@ class ZeldaCanvas {
           if (tile === water) continue;
         }
 
-      g.translate(-this.camX, -this.camY);
-      while (sorted != null && sorted.tileRow <= this.row && sorted.tileOffset > 0) {
-        if (ZeldaCanvas.isOnScreen(this, sorted)) sorted.paint(g);
-        sorted = sorted.next;
-      }
-      g.translate(this.camX, this.camY);
-
-      g.setClip(0, 0, this.viewW, this.viewH);
-      g.translate(-this.camX, -this.camY);
-      while (sorted != null && sorted.tileRow <= this.row) {
-        if (ZeldaCanvas.isOnScreen(this, sorted)) sorted.paint(g);
-        sorted = sorted.next;
-      }
-      g.translate(this.camX, this.camY);
       this.nextXY();
     }
 
+    g.setClip(0, 0, this.viewW, this.viewH);
+    this.paintSprites(g);
+  }
+
+  /* Ground stays on the 2005 diamond walker. Sprites are drawn afterwards,
+     back to front. Interleaving them into the tile rows clipped tall huts
+     and, once the yogi setClip ran, every sprite painted after them. */
+  paintSprites(g) {
+    if (this.player) this.gatherVisible(this.player.tileX, this.player.tileY);
+    const draw = [];
+    for (let i = 0; i < this.visibleProps.length; i++) {
+      const p = this.visibleProps[i];
+      if (ZeldaCanvas.isOnScreen(this, p)) draw.push(p);
+    }
+    if (this.player) draw.push(this.player);
+    for (const remote of this.remotes.values()) draw.push(remote);
+    draw.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    g.setClip(0, 0, this.viewW, this.viewH);
+    g.translate(-this.camX, -this.camY);
+    for (let i = 0; i < draw.length; i++) draw[i].paint(g);
+    g.translate(this.camX, this.camY);
     g.setClip(0, 0, this.viewW, this.viewH);
   }
 

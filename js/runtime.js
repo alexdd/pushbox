@@ -58,6 +58,19 @@ class Graphics {
     this.clipW = Math.max(0, x1 - x0); this.clipH = Math.max(0, y1 - y0);
   }
 
+  /* Sprite sheets clip to one frame. Callers must restore the previous clip
+     or every later sprite is cut down to that frame. */
+  captureClip() {
+    return { clipX: this.clipX, clipY: this.clipY, clipW: this.clipW, clipH: this.clipH };
+  }
+
+  restoreClip(saved) {
+    this.clipX = saved.clipX;
+    this.clipY = saved.clipY;
+    this.clipW = saved.clipW;
+    this.clipH = saved.clipH;
+  }
+
   _isect(dx, dy, dw, dh) {
     const x0 = Math.max(this.clipX, dx);
     const y0 = Math.max(this.clipY, dy);
