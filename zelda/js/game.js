@@ -26,13 +26,22 @@ const Hyrule = {
 function qs(id) { return document.getElementById(id); }
 
 function fitView() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const vv = window.visualViewport;
+  const w = Math.round(vv ? vv.width : window.innerWidth);
+  const h = Math.round(vv ? vv.height : window.innerHeight);
+  const overlap = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+  document.documentElement.style.setProperty("--kb", overlap + "px");
+  document.body.classList.toggle("keyboard", overlap > 80);
   const dpr = window.devicePixelRatio || 1;
-  const scale = Math.max(2, Math.min(4, Math.round(dpr + (w < 700 ? 1 : 0))));
-  const viewW = Math.max(240, Math.floor(w / scale));
-  const viewH = Math.max(180, Math.floor(h / scale));
-  if (Hyrule.engine) Hyrule.engine.resize(viewW, viewH);
+  const scale = w < 700 ? Math.max(2, Math.min(3, Math.round(dpr))) : Math.max(2, Math.min(3, Math.round(dpr)));
+  const viewW = Math.max(200, Math.floor(w / scale));
+  const viewH = Math.max(160, Math.floor(h / scale));
+  if (Hyrule.engine) {
+    Hyrule.engine.resize(viewW, viewH);
+    const hud = qs("hud");
+    const hudPx = hud && !hud.classList.contains("hidden") ? hud.getBoundingClientRect().height : 0;
+    Hyrule.engine.uiTop = Math.ceil((hudPx * viewH) / Math.max(1, h)) + 2;
+  }
   const screen = qs("screen");
   screen.style.width = w + "px";
   screen.style.height = h + "px";
@@ -257,6 +266,7 @@ function enterWorld() {
   qs("login").classList.add("hidden");
   qs("hud").classList.remove("hidden");
   qs("pad").classList.remove("hidden");
+  fitView();
   qs("chat").classList.remove("hidden");
 }
 
@@ -441,24 +451,32 @@ function wireInput() {
 
   function bindPad(id, dir) {
     const el = qs(id);
-    const start = (ev) => { ev.preventDefault(); e.holdDir(dir, true); };
+    const start = (ev) => {
+      ev.preventDefault();
+      if (ev.pointerId != null && el.setPointerCapture) el.setPointerCapture(ev.pointerId);
+      e.holdDir(dir, true);
+    };
     const end = (ev) => { ev.preventDefault(); e.holdDir(dir, false); };
-    el.addEventListener("touchstart", start, { passive: false });
-    el.addEventListener("touchend", end, { passive: false });
-    el.addEventListener("touchcancel", end, { passive: false });
-    el.addEventListener("mousedown", start);
-    window.addEventListener("mouseup", end);
+    el.addEventListener("pointerdown", start);
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
+    el.addEventListener("lostpointercapture", end);
   }
   bindPad("pad-up", "up");
   bindPad("pad-down", "down");
   bindPad("pad-left", "left");
   bindPad("pad-right", "right");
 
-  qs("pad-act").addEventListener("touchstart", (ev) => {
+  qs("pad-act").addEventListener("pointerdown", (ev) => {
     ev.preventDefault();
     send({ t: "emote", kind: "namaste" });
-  }, { passive: false });
-  qs("pad-act").addEventListener("click", () => send({ t: "emote", kind: "namaste" }));
+  });
+  const chatToggle = qs("chat-toggle");
+  chatToggle.addEventListener("click", () => {
+    const open = document.body.classList.toggle("chat-open");
+    chatToggle.setAttribute("aria-pressed", open ? "true" : "false");
+    if (open) qs("chat-input").focus();
+  });
 
   qs("chat-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -524,7 +542,11 @@ function boot() {
   Hyrule.engine.assets = Hyrule.assets;
   fitView();
   window.addEventListener("resize", fitView);
-  window.addEventListener("orientationchange", () => setTimeout(fitView, 200));
+  window.addEventListener("orientationchange", () => setTimeout(fitView, 250));
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", fitView);
+    window.visualViewport.addEventListener("scroll", fitView);
+  }
   wireAuth();
   wireInput();
   startLoop();

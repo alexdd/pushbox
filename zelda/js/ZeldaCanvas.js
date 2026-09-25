@@ -97,6 +97,7 @@ class ZeldaCanvas {
     this.data = [];
     this.blocked = null;
     this.emotes = new Map();
+    this.uiTop = 8;
   }
 
   getWidth() { return this.viewW; }
@@ -665,19 +666,22 @@ class ZeldaCanvas {
 
     if (this.minimap && this.player) {
       const mm = this.minimap;
-      const mx = this.viewW - mm.width - 8;
-      const my = 8;
-      ctx.drawImage(mm, mx, my);
+      const fit = this.viewW < 280 ? 0.42 : this.viewW < 480 ? 0.55 : 0.75;
+      const dw = Math.round(mm.width * fit);
+      const dh = Math.round(mm.height * fit);
+      const mx = this.viewW - dw - 6;
+      const my = Math.max(4, this.uiTop || 8);
+      ctx.drawImage(mm, mx, my, dw, dh);
       ctx.strokeStyle = "#f2d24a";
-      ctx.strokeRect(mx, my, mm.width, mm.height);
-      const px = mx + (this.player.tileX / this.width_map) * mm.width;
-      const py = my + (this.player.tileY / this.height_map) * mm.height;
+      ctx.strokeRect(mx, my, dw, dh);
+      const px = mx + (this.player.tileX / this.width_map) * dw;
+      const py = my + (this.player.tileY / this.height_map) * dh;
       ctx.fillStyle = "#fff";
       ctx.fillRect(px - 1, py - 1, 3, 3);
       for (const r of [...this.remotes.values(), ...this.npcs.values()]) {
         ctx.fillStyle = r.color || "#f44";
-        const rx = mx + (r.tileX / this.width_map) * mm.width;
-        const ry = my + (r.tileY / this.height_map) * mm.height;
+        const rx = mx + (r.tileX / this.width_map) * dw;
+        const ry = my + (r.tileY / this.height_map) * dh;
         ctx.fillRect(rx - 1, ry - 1, 3, 3);
       }
     }

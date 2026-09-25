@@ -6,12 +6,19 @@
   --green: #305331;
   --edge: #5c462e;
   --saffron: #c8965f;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --kb: 0px;
+  --pad: 56px;
 }
 html, body {
   margin: 0;
   padding: 0;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background: #151a11;
   color: var(--ink);
@@ -22,11 +29,17 @@ html, body {
 }
 canvas#screen {
   display: block;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #1c2618;
+}
+input, textarea, select {
+  touch-action: manipulation;
+  -webkit-user-select: text;
+  user-select: text;
 }
 .hidden { display: none !important; }
 
@@ -35,10 +48,10 @@ canvas#screen {
   top: 0; left: 0; right: 0;
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
-  padding-right: 180px;
-  background: linear-gradient(180deg, rgba(21,26,17,.92), transparent);
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + var(--safe-t)) calc(12px + var(--safe-r)) 8px calc(12px + var(--safe-l));
+  background: linear-gradient(180deg, rgba(21,26,17,.92), rgba(21,26,17,.55) 70%, transparent);
   font-size: 13px;
   pointer-events: none;
   z-index: 3;
@@ -53,11 +66,13 @@ canvas#screen {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: calc(16px + var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l));
   background:
     radial-gradient(circle at 30% 20%, rgba(212,165,116,.22), transparent 42%),
     #151a11;
   z-index: 5;
+  overflow: auto;
+  touch-action: pan-y;
 }
 .card {
   width: min(420px, 100%);
@@ -109,8 +124,8 @@ h1 {
 .checks { display: flex; flex-wrap: wrap; gap: 6px; }
 .checks label { display: flex; gap: 4px; align-items: center; font-size: 12px; background: #253f23; padding: 4px 8px; border-radius: 6px; }
 
-#menu-bar { display: flex; gap: 6px; pointer-events: auto; }
-#menu-bar button { padding: 6px 10px; font-size: 12px; }
+#menu-bar { display: flex; gap: 6px; pointer-events: auto; flex-wrap: wrap; }
+#menu-bar button { padding: 8px 12px; min-height: 40px; font-size: 13px; }
 
 #overlay {
   position: fixed; inset: 0;
@@ -118,15 +133,19 @@ h1 {
   z-index: 8;
   display: flex; align-items: flex-end; justify-content: center;
   padding: 12px;
+  padding-bottom: calc(12px + var(--safe-b));
+  touch-action: manipulation;
 }
 .sheet {
   width: min(520px, 100%);
-  max-height: min(78vh, 640px);
+  max-height: min(78dvh, 640px);
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--panel);
   border: 2px solid var(--gold);
   border-radius: 12px 12px 8px 8px;
   padding: 12px 14px 16px;
+  touch-action: pan-y;
 }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; }
 .sheet-head h2 { margin: 0; font-size: 18px; color: var(--saffron); }
@@ -145,47 +164,50 @@ h1 {
 
 #pad {
   position: fixed;
-  left: 12px;
-  bottom: 12px;
+  left: calc(10px + var(--safe-l));
+  right: calc(10px + var(--safe-r));
+  bottom: calc(10px + var(--safe-b) + var(--kb));
   display: flex;
   align-items: flex-end;
-  gap: 24px;
+  gap: 16px;
   z-index: 4;
-  width: calc(100% - 24px);
   justify-content: space-between;
   pointer-events: none;
 }
 .dpad {
-  width: 148px;
-  height: 148px;
-  position: relative;
-  pointer-events: auto;
+  display: grid;
+  grid-template-columns: var(--pad) var(--pad) var(--pad);
+  grid-template-rows: var(--pad) var(--pad) var(--pad);
+  pointer-events: none;
 }
-.dpad button, #pad-act {
-  position: absolute;
-  width: 48px;
-  height: 48px;
+.dpad button {
+  position: static;
+  width: var(--pad);
+  height: var(--pad);
   font-size: 18px;
   pointer-events: auto;
+  touch-action: none;
 }
-#pad-up { top: 0; left: 50px; }
-#pad-down { bottom: 0; left: 50px; }
-#pad-left { top: 50px; left: 0; }
-#pad-right { top: 50px; right: 0; }
+#pad-up { grid-column: 2; grid-row: 1; }
+#pad-left { grid-column: 1; grid-row: 2; }
+#pad-right { grid-column: 3; grid-row: 2; }
+#pad-down { grid-column: 2; grid-row: 3; }
 #pad-act {
   position: relative;
   width: 72px;
   height: 72px;
   border-radius: 50%;
   font-size: 28px;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
+  pointer-events: auto;
+  touch-action: none;
 }
 
 #chat {
   position: fixed;
-  left: 12px;
-  bottom: 172px;
-  width: min(320px, calc(100vw - 24px));
+  left: calc(10px + var(--safe-l));
+  bottom: calc(var(--pad) * 3 + 28px + var(--safe-b) + var(--kb));
+  width: min(340px, calc(100vw - 20px - var(--safe-l) - var(--safe-r)));
   z-index: 4;
   pointer-events: none;
 }
@@ -206,12 +228,46 @@ h1 {
 #chat-form input { flex: 1; border-radius: 0 0 0 8px; }
 #chat-form button { border-radius: 0 0 8px 0; padding: 8px 10px; }
 
+body.keyboard #pad { visibility: hidden; }
+body.keyboard #chat { bottom: calc(8px + var(--safe-b) + var(--kb)); }
+
 @media (min-width: 900px) {
-  #pad { opacity: 0.35; }
+  #pad { opacity: 0.4; }
   #pad:hover, #pad:focus-within { opacity: 1; }
+  #chat-toggle { display: none; }
 }
-@media (max-width: 699px) {
-  #hud { padding-right: 12px; font-size: 12px; }
+@media (max-width: 899px) {
+  :root { --pad: 58px; }
+  #hud {
+    flex-wrap: wrap;
+    align-items: stretch;
+    font-size: 12px;
+    gap: 6px;
+  }
+  .hud-left, .hud-right { gap: 8px; }
+  .hud-tile { display: none; }
+  #menu-bar { width: 100%; }
+  #menu-bar button { flex: 1; min-height: 44px; }
+  #status { display: none; }
   h1 { font-size: 32px; letter-spacing: 4px; }
-  #chat { bottom: 178px; }
+  #chat-log { max-height: 76px; }
+  body:not(.chat-open) #chat-log,
+  body:not(.chat-open) #chat-form { display: none; }
+  #overlay { padding: 0; align-items: flex-end; }
+  .sheet {
+    width: 100%;
+    max-height: 88dvh;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: calc(16px + var(--safe-b));
+  }
+}
+@media (min-width: 700px) and (max-width: 1100px) {
+  :root { --pad: 64px; }
+  #pad { opacity: 0.92; }
+}
+@media (max-height: 480px) {
+  :root { --pad: 46px; }
+  #chat-log { max-height: 48px; }
+  h1 { font-size: 26px; letter-spacing: 2px; }
+  .lead, .hint { display: none; }
 }
