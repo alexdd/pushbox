@@ -12,6 +12,7 @@ const os = require("os");
 const path = require("path");
 const vm = require("vm");
 const { generateWorld, isWalkable, TILE } = require("../shared/world");
+const { createPopulation, stepAll } = require("../shared/npcs");
 const { buildServer, MAX_PLAYERS } = require("../server/index");
 
 function section(name) { console.log("  · " + name); }
@@ -41,6 +42,28 @@ const world2 = generateWorld(1998, 1000);
 assert.deepStrictEqual(Buffer.from(world.tiles), Buffer.from(world2.tiles), "same seed is deterministic");
 assert.strictEqual(world.trees.length, world2.trees.length);
 assert.strictEqual(world.temples.length, world2.temples.length);
+
+section("ashram residents");
+const pop = createPopulation(world);
+assert.strictEqual(pop.npcs.length, 30);
+const names = new Set(pop.npcs.map((n) => n.name));
+assert.strictEqual(names.size, 30);
+const behaviors = new Set(pop.npcs.map((n) => n.behavior));
+assert.ok(behaviors.has("still") && behaviors.has("pace") && behaviors.has("wander") && behaviors.has("circuit") && behaviors.has("pilgrim") && behaviors.has("greet"));
+for (let i = 0; i < pop.npcs.length; i++) {
+  const n = pop.npcs[i];
+  assert.ok(isWalkable(world, n.tx, n.ty), n.name + " must stand on walkable ground");
+}
+const stillBefore = pop.npcs.filter((n) => n.behavior === "still").map((n) => n.tx + "," + n.ty);
+const mover = pop.npcs.find((n) => n.behavior === "pace" || n.behavior === "wander" || n.behavior === "pilgrim");
+const moverBefore = mover.tx + "," + mover.ty;
+for (let i = 0; i < 40; i++) stepAll(pop, world, [{ tx: world.spawn.x, ty: world.spawn.y }], 100000 + i * 1000);
+for (let i = 0; i < pop.npcs.length; i++) {
+  assert.ok(isWalkable(world, pop.npcs[i].tx, pop.npcs[i].ty), pop.npcs[i].name + " left the path");
+}
+const stillAfter = pop.npcs.filter((n) => n.behavior === "still").map((n) => n.tx + "," + n.ty);
+assert.deepStrictEqual(stillAfter, stillBefore, "sitting yogis stay on their mat");
+assert.notStrictEqual(pop.npcs.find((n) => n.id === mover.id).tx + "," + pop.npcs.find((n) => n.id === mover.id).ty, moverBefore, "a walking yogi should leave the first tile");
 
 section("tile engine (1000×1000)");
 function stubCtx() {
@@ -120,6 +143,8 @@ const engineOut = vm.runInContext(`
     if (!painted.has(p)) missing++;
   }
   engine.paint();
+  const ground = engine.visibleTiles();
+  const under = ground.some((t) => t.tx === engine.player.tileX && t.ty === engine.player.tileY);
   ({
     size: engine.width_map,
     objects: engine.props.length,
@@ -129,7 +154,8 @@ const engineOut = vm.runInContext(`
     tile: engine.getTile(before.x, before.y),
     clipHeld,
     missing,
-    onScreen
+    onScreen,
+    under
   });
 `, sandbox);
 
@@ -138,6 +164,7 @@ assert.ok(engineOut.objects > 200, "props (trees+huts+temples) loaded");
 assert.strictEqual(engineOut.clipHeld, true, "yogi sprite clip must not stick");
 assert.ok(engineOut.onScreen > 0, "some trees or huts should be on screen");
 assert.strictEqual(engineOut.missing, 0, "on-screen trees and huts must all be painted");
+assert.strictEqual(engineOut.under, true, "the tile under the yogi must be in the camera window");
 assert.ok(engineOut.temples >= 5, "temple props placed");
 assert.ok(engineOut.moved, "yogi should walk on the plaza");
 assert.ok(engineOut.tile === TILE.PATH || engineOut.tile === TILE.GRASS || engineOut.tile === TILE.FLOWER);
@@ -153,6 +180,7 @@ section("fastify + websocket + auth");
   assert.strictEqual(health.world.size, 1000);
   assert.ok((health.world.temples || []).length >= 7);
   assert.strictEqual(health.max, MAX_PLAYERS);
+  assert.strictEqual(health.npcs, 30);
 
   const suffix = String(Date.now() % 100000);
   const reg = await fetch("http://127.0.0.1:" + port + "/api/register", {

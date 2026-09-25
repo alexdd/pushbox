@@ -96,7 +96,7 @@ function updateHud() {
     : "Pfad";
 
   const next = new Set();
-  for (const r of e.remotes.values()) {
+  for (const r of [...e.remotes.values(), ...e.npcs.values()]) {
     if (Math.abs(r.tileX - e.player.tileX) + Math.abs(r.tileY - e.player.tileY) <= 3) {
       next.add(r.pid);
       if (!Hyrule.nearby.has(r.pid)) appendChat(r.name + " ist in der Nähe — antippen zum Chatten.", "sys");
@@ -270,11 +270,13 @@ function onMessage(msg) {
       e.loadWorld(Hyrule.world, Hyrule.assets);
       e.spawnLocal(msg.player);
       for (let i = 0; i < msg.players.length; i++) e.upsertRemote(msg.players[i]);
+      const residents = msg.npcs || [];
+      for (let i = 0; i < residents.length; i++) e.upsertNpc(residents[i]);
       e.state = ZeldaCanvas.STATE_GAME;
       Hyrule.joined = true;
       enterWorld();
       setStatus(msg.player.name + " betritt den Ashram");
-      appendChat("Namaste, " + msg.player.name + ". Klicke Yogis an, um zu chatten.", "sys");
+      appendChat("Namaste, " + msg.player.name + ". Im Ashram üben " + (msg.npcs || []).length + " Yogis, jeder auf seine Art.", "sys");
       maybeSendMove(true);
       updateHud();
       break;
@@ -291,6 +293,9 @@ function onMessage(msg) {
       break;
     case "move":
       e.upsertRemote(msg.player);
+      break;
+    case "npcs":
+      for (let i = 0; i < (msg.npcs || []).length; i++) e.upsertNpc(msg.npcs[i]);
       break;
     case "say":
       appendChat(msg.name + ": " + msg.text);

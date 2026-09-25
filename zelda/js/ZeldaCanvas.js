@@ -3,10 +3,9 @@
  * All rights reserved.
  *
  * ZeldaCanvas — the PushBox isometric tile engine, scaled to a 1000×1000
- * overworld. The walker (setSlide / setCamGrid / nextXY / setRlen /
- * tile_x / tile_y / paintGame) is the 2005 algorithm with only three
- * adaptations: instance viewport size, extra tile types, and a bounds
- * check on rIndex so the camera can sit near the map edge.
+ * overworld. Ground tiles use a camera window and painter's order
+ * (back to front by tileX + tileY). The 2005 diamond walker remains in
+ * PushBoxCanvas for the sokoban levels.
  */
 "use strict";
 
@@ -87,6 +86,7 @@ class ZeldaCanvas {
     this.player = null;
     this.localId = 0;
     this.remotes = new Map();
+    this.npcs = new Map();
     this.props = [];
     this.hash = new Map();
     this.sorted = null;
@@ -451,7 +451,7 @@ class ZeldaCanvas {
     const wx = screenX + this.camX;
     const wy = screenY + this.camY;
     let best = null;
-    for (const o of this.remotes.values()) {
+    for (const o of [...this.remotes.values(), ...this.npcs.values()]) {
       const x = o.x + o.offsetX;
       const y = o.y + o.offsetY;
       if (wx >= x - 4 && wx <= x + o.swidth + 4 && wy >= y - 8 && wy <= y + o.sheight + 4) {
@@ -464,6 +464,34 @@ class ZeldaCanvas {
   removeRemote(id) {
     this.remotes.delete(id);
     this.emotes.delete(id);
+  }
+
+  upsertNpc(info) {
+    let o = this.npcs.get(info.id);
+    const born = !o;
+    if (!o) {
+      o = new Sprite(info.id);
+      o.init(Sprite.TYPE_LION);
+      o.isPlayer = false;
+      this.npcs.set(info.id, o);
+    }
+    o.name = info.name;
+    o.color = info.color;
+    o.gender = info.gender || "female";
+    o.pid = info.id;
+    o.focus = info.focus || "hatha";
+    o.slot = info.slot || 0;
+    o.setSpriteImage(this.yogiSheet(info), Sprite.TYPE_LION);
+    const moved = born || o.tileX !== info.tx || o.tileY !== info.ty;
+    if (moved) o.setTile(info.tx, info.ty, info.dir == null ? 2 : info.dir & 3);
+    o.dir = (info.dir == null ? o.dir : info.dir) & 3;
+    if (info.moving) {
+      o.frames = Sprite.FRAMES_MOVING;
+      o.frame = Sprite.FRAMES_MOVING[0];
+      o.frameIndex = 0;
+      o.frameDelay = Sprite.DEFAULT_FRAME_RATE;
+    }
+    return o;
   }
 
   processKeys() {
@@ -489,6 +517,7 @@ class ZeldaCanvas {
     this.setCamera(this.player.x, this.player.y);
     this.player.update(this.frameTime);
     for (const remote of this.remotes.values()) remote.animate(this.frameTime);
+    for (const npc of this.npcs.values()) npc.animate(this.frameTime);
     if (this.player.tileX !== this.lastHashCX || this.player.tileY !== this.lastHashCY) {
       this.gatherVisible(this.player.tileX, this.player.tileY);
       this.lastHashCX = this.player.tileX;
@@ -523,40 +552,58 @@ class ZeldaCanvas {
     g.fillRect(0, 0, this.viewW, this.viewH);
   }
 
+  /* Ground is a camera window over the iso grid, drawn back to front.
+     The 2005 diamond walker stays in PushBoxCanvas for the sokoban levels.
+     Here it dropped tall roofs and any sprite painted after a setClip. */
+  visibleTiles() {
+    const halfW = ZeldaCanvas.TILE_DX >> 1;
+    const halfH = ZeldaCanvas.TILE_DY >> 1;
+    const margin = 3;
+    const corners = [
+      [this.camX - halfW, this.camY - halfH],
+      [this.camX + this.viewW + halfW, this.camY - halfH],
+      [this.camX - halfW, this.camY + this.viewH + halfH],
+      [this.camX + this.viewW + halfW, this.camY + this.viewH + halfH]
+    ];
+    let minTx = 1e9, maxTx = -1e9, minTy = 1e9, maxTy = -1e9;
+    for (let i = 0; i < corners.length; i++) {
+      const ax = (corners[i][0] - this.top_map) / halfW;
+      const ay = corners[i][1] / halfH;
+      const tx = (ax + ay) / 2;
+      const ty = (ay - ax) / 2;
+      if (tx < minTx) minTx = tx;
+      if (tx > maxTx) maxTx = tx;
+      if (ty < minTy) minTy = ty;
+      if (ty > maxTy) maxTy = ty;
+    }
+    const x0 = Math.max(0, Math.floor(minTx) - margin);
+    const x1 = Math.min(this.width_map - 1, Math.ceil(maxTx) + margin);
+    const y0 = Math.max(0, Math.floor(minTy) - margin);
+    const y1 = Math.min(this.height_map - 1, Math.ceil(maxTy) + margin);
+    const list = [];
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        list.push({ tx, ty, depth: tx + ty, tile: this.tiles[ty * this.width_map + tx] });
+      }
+    }
+    list.sort((a, b) => a.depth - b.depth || a.tx - b.tx);
+    return list;
+  }
+
   paintGame(g) {
     this.paintTexture(g);
-    this.setCamGrid();
-    this.setSlide();
-    this.setRlen();
-
-    const size = this.size_map;
-    const water = ZeldaWorld.TILE.WATER;
-
-    for (let i = this.VP_TILES_HEIGHT; --i >= 0; this.y += ZeldaCanvas.TILE_DY >> 1) {
-      g.setClip(0, 0, this.viewW, this.viewH);
-
-      if (this.y < this.viewH)
-        for (let j = this.VP_TILES_WIDTH, px = this.x, rIndex = this.index, r = this.rOff;
-             --j >= 0; px += ZeldaCanvas.TILE_DX, rIndex -= (this.width_map - 1), r++) {
-          if (r < 0 || r >= this.rLen) continue;
-          if (rIndex < 0 || rIndex >= size) continue;
-          const tile = this.tiles[rIndex];
-          const ty = (rIndex / this.width_map) | 0;
-          const tx = rIndex - ty * this.width_map;
-          g.drawImage(this.tileImage(tile, tx, ty), px, this.y, Graphics.TOP | Graphics.LEFT);
-          if (tile === water) continue;
-        }
-
-      this.nextXY();
+    g.setClip(0, 0, this.viewW, this.viewH);
+    const tiles = this.visibleTiles();
+    g.translate(-this.camX, -this.camY);
+    for (let i = 0; i < tiles.length; i++) {
+      const t = tiles[i];
+      g.drawImage(this.tileImage(t.tile, t.tx, t.ty), this.tile_x(t.tx, t.ty), this.tile_y(t.tx, t.ty), Graphics.TOP | Graphics.LEFT);
     }
-
+    g.translate(this.camX, this.camY);
     g.setClip(0, 0, this.viewW, this.viewH);
     this.paintSprites(g);
   }
 
-  /* Ground stays on the 2005 diamond walker. Sprites are drawn afterwards,
-     back to front. Interleaving them into the tile rows clipped tall huts
-     and, once the yogi setClip ran, every sprite painted after them. */
   paintSprites(g) {
     if (this.player) this.gatherVisible(this.player.tileX, this.player.tileY);
     const draw = [];
@@ -566,6 +613,7 @@ class ZeldaCanvas {
     }
     if (this.player) draw.push(this.player);
     for (const remote of this.remotes.values()) draw.push(remote);
+    for (const npc of this.npcs.values()) draw.push(npc);
     draw.sort((a, b) => (a.y - b.y) || (a.x - b.x));
     g.setClip(0, 0, this.viewW, this.viewH);
     g.translate(-this.camX, -this.camY);
@@ -585,7 +633,7 @@ class ZeldaCanvas {
     const ctx = this.canvasEl.getContext("2d");
     ctx.save();
     ctx.translate(-this.camX, -this.camY);
-    const people = [this.player, ...this.remotes.values()].filter(Boolean);
+    const people = [this.player, ...this.remotes.values(), ...this.npcs.values()].filter(Boolean);
     for (let i = 0; i < people.length; i++) {
       const o = people[i];
       const label = o.name || "Yogi";
@@ -626,7 +674,7 @@ class ZeldaCanvas {
       const py = my + (this.player.tileY / this.height_map) * mm.height;
       ctx.fillStyle = "#fff";
       ctx.fillRect(px - 1, py - 1, 3, 3);
-      for (const r of this.remotes.values()) {
+      for (const r of [...this.remotes.values(), ...this.npcs.values()]) {
         ctx.fillStyle = r.color || "#f44";
         const rx = mx + (r.tileX / this.width_map) * mm.width;
         const ry = my + (r.tileY / this.height_map) * mm.height;

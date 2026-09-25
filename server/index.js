@@ -11,6 +11,7 @@
 const path = require("path");
 const Fastify = require("fastify");
 const { generateWorld, isWalkable, spawnForSlot, publicMeta } = require("../shared/world");
+const { createPopulation, stepAll, publicNpc } = require("../shared/npcs");
 const Catalog = require("../shared/catalog");
 const { createStore } = require("./store");
 
@@ -61,6 +62,23 @@ async function buildServer(opts) {
   store.ensureFestivals(world.temples || world.villages);
   const players = new Map();
   let nextId = 1;
+  const ashram = createPopulation(world);
+
+  function npcSnapshot() {
+    return ashram.npcs.map(publicNpc);
+  }
+
+  function tickNpcs() {
+    const nearby = [];
+    for (const p of players.values()) nearby.push({ tx: p.tx, ty: p.ty });
+    const says = stepAll(ashram, world, nearby, Date.now());
+    broadcast({ t: "npcs", npcs: npcSnapshot() });
+    for (let i = 0; i < says.length; i++) {
+      broadcast({ t: "say", id: says[i].id, name: says[i].name, text: says[i].text, npc: true });
+    }
+  }
+  const npcTimer = setInterval(tickNpcs, 700);
+  if (typeof npcTimer.unref === "function") npcTimer.unref();
 
   function usedSlots() {
     const used = new Set();
@@ -137,7 +155,8 @@ async function buildServer(opts) {
       world: publicMeta(world),
       calendar: calendarPayload(me.accountId),
       catalog: { deities: Catalog.DEITIES, asanas: Catalog.ASANAS, foci: Catalog.FOCI },
-      max: MAX_PLAYERS
+      max: MAX_PLAYERS,
+      npcs: npcSnapshot()
     });
     broadcast({ t: "join", player: publicPlayer(me) }, me.id);
     return me;
@@ -149,6 +168,7 @@ async function buildServer(opts) {
   app.get("/api/health", async () => ({
     ok: true,
     players: players.size,
+    npcs: ashram.npcs.length,
     max: MAX_PLAYERS,
     world: publicMeta(world)
   }));
