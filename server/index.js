@@ -77,7 +77,7 @@ async function buildServer(opts) {
       broadcast({ t: "say", id: says[i].id, name: says[i].name, text: says[i].text, npc: true });
     }
   }
-  const npcTimer = setInterval(tickNpcs, 700);
+  const npcTimer = setInterval(tickNpcs, 420);
   if (typeof npcTimer.unref === "function") npcTimer.unref();
 
   function usedSlots() {

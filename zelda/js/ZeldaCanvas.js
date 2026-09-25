@@ -483,16 +483,47 @@ class ZeldaCanvas {
     o.focus = info.focus || "hatha";
     o.slot = info.slot || 0;
     o.setSpriteImage(this.yogiSheet(info), Sprite.TYPE_LION);
-    const moved = born || o.tileX !== info.tx || o.tileY !== info.ty;
-    if (moved) o.setTile(info.tx, info.ty, info.dir == null ? 2 : info.dir & 3);
-    o.dir = (info.dir == null ? o.dir : info.dir) & 3;
+    const tx = info.tx | 0;
+    const ty = info.ty | 0;
+    const dir = info.dir == null ? 2 : info.dir & 3;
+    const destX = this.tile_x(tx, ty) + Sprite.TILE_X;
+    const destY = this.tile_y(tx, ty) + Sprite.TILE_Y;
+    if (born || o.walkT == null) {
+      o.setTile(tx, ty, dir);
+      o.walkT = 1;
+    } else if (o.tileX !== tx || o.tileY !== ty) {
+      o.walkSX = o.x;
+      o.walkSY = o.y;
+      o.walkDX = destX;
+      o.walkDY = destY;
+      o.walkT = 0;
+      o.tileX = tx;
+      o.tileY = ty;
+      o.tileRow = tx + ty;
+    }
+    o.dir = dir;
+    o.frameOffset = dir * 3;
     if (info.moving) {
       o.frames = Sprite.FRAMES_MOVING;
-      o.frame = Sprite.FRAMES_MOVING[0];
-      o.frameIndex = 0;
+      o.frame = Sprite.FRAMES_MOVING[o.frameIndex % Sprite.FRAMES_MOVING.length];
       o.frameDelay = Sprite.DEFAULT_FRAME_RATE;
+    } else if (o.walkT >= 1) {
+      o.frames = null;
+      o.frame = 0;
     }
     return o;
+  }
+
+  stepNpcs() {
+    const span = 400;
+    for (const o of this.npcs.values()) {
+      if (o.walkT == null || o.walkT >= 1) continue;
+      o.walkT = Math.min(1, o.walkT + this.frameTime / span);
+      const t = o.walkT;
+      o.x = o.walkSX + (o.walkDX - o.walkSX) * t;
+      o.y = o.walkSY + (o.walkDY - o.walkSY) * t;
+      o.moved = true;
+    }
   }
 
   processKeys() {
@@ -518,6 +549,7 @@ class ZeldaCanvas {
     this.setCamera(this.player.x, this.player.y);
     this.player.update(this.frameTime);
     for (const remote of this.remotes.values()) remote.animate(this.frameTime);
+    this.stepNpcs();
     for (const npc of this.npcs.values()) npc.animate(this.frameTime);
     if (this.player.tileX !== this.lastHashCX || this.player.tileY !== this.lastHashCY) {
       this.gatherVisible(this.player.tileX, this.player.tileY);

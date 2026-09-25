@@ -171,8 +171,17 @@
     return false;
   }
 
+  function stepPace(npc, world, used) {
+    const order = [npc.dir, (npc.dir + 1) & 3, (npc.dir + 3) & 3, (npc.dir + 2) & 3];
+    for (let i = 0; i < order.length; i++) {
+      const dir = order[i];
+      const [dx, dy] = DIRS[dir];
+      if (move(npc, world, used, npc.tx + dx, npc.ty + dy, dir)) return;
+    }
+    npc.moving = false;
+  }
+
   function stepOne(npc, npcs, world, players, now) {
-    if (npc.wait > 0) { npc.wait--; npc.moving = false; return null; }
     const used = occupiedSet(npcs, npc);
     let said = null;
     if (npc.behavior === "still") {
@@ -182,11 +191,7 @@
       npc.moving = false;
       if (playerNear(npc, players, 6)) said = maybeSay(npc, now, true);
     } else if (npc.behavior === "pace") {
-      const [dx, dy] = DIRS[npc.dir];
-      if (!move(npc, world, used, npc.tx + dx, npc.ty + dy, npc.dir)) {
-        npc.dir = (npc.dir + 2) & 3;
-        npc.moving = false;
-      }
+      stepPace(npc, world, used);
       said = maybeSay(npc, now, false);
     } else if (npc.behavior === "wander") {
       const order = [0, 1, 2, 3];
@@ -213,7 +218,6 @@
       if (!next || !toward(npc, world, used, next)) npc.moving = false;
       said = maybeSay(npc, now, false);
     }
-    npc.wait = Math.max(0, npc.tempo - 1);
     return said;
   }
 
