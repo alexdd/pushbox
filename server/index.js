@@ -3,8 +3,8 @@
  * All rights reserved.
  *
  * Fastify + WebSocket backend for the Yoga Event Area.
- * Register/login, temple festivals, calendar, meet-ups and
- * private yogi chat — all live over WebSockets (max 5 online).
+ * Yoga-website accounts only. Temple festivals, calendar, meet-ups
+ * and private yogi chat live over WebSockets (max 5 online).
  */
 "use strict";
 
@@ -178,21 +178,6 @@ async function buildServer(opts) {
     deities: Catalog.DEITIES, asanas: Catalog.ASANAS, foci: Catalog.FOCI
   }));
 
-  app.post("/api/register", async (req, reply) => {
-    const result = store.register(req.body || {});
-    if (result.error) return reply.code(400).send(result);
-    const token = store.createSession(result.account);
-    return { token, account: result.account };
-  });
-
-  app.post("/api/login", async (req, reply) => {
-    const body = req.body || {};
-    const result = store.login(body.name, body.password);
-    if (result.error) return reply.code(401).send(result);
-    const token = store.createSession(result.account);
-    return { token, account: result.account };
-  });
-
   app.post("/api/yoga-login", async (req, reply) => {
     const auth = req.headers.authorization || "";
     if (!/^Basic\s+\S+/i.test(auth)) {
@@ -292,19 +277,10 @@ async function buildServer(opts) {
         return;
       }
 
-      if (msg.t === "join") {
-        if (me) return;
-        const gender = msg.gender === "female" ? "female" : "male";
-        me = admit(socket, {
-          name: msg.name,
-          gender,
-          asanas: Catalog.sanitizeAsanas(msg.asanas),
-          focus: Catalog.sanitizeFocus(msg.focus)
-        });
+      if (!me) {
+        send(socket, { t: "error", code: "auth", message: "Bitte mit dem Yoga-Website-Konto anmelden." });
         return;
       }
-
-      if (!me) return;
 
       if (msg.t === "move") {
         const tx = msg.tx | 0, ty = msg.ty | 0;

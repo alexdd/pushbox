@@ -45,24 +45,22 @@ assert.strictEqual(world.temples.length, world2.temples.length);
 
 section("ashram residents");
 const pop = createPopulation(world);
-assert.strictEqual(pop.npcs.length, 30);
+assert.strictEqual(pop.npcs.length, 6);
 const names = new Set(pop.npcs.map((n) => n.name));
-assert.strictEqual(names.size, 30);
+assert.strictEqual(names.size, 6);
 const behaviors = new Set(pop.npcs.map((n) => n.behavior));
-assert.ok(behaviors.has("still") && behaviors.has("pace") && behaviors.has("wander") && behaviors.has("circuit") && behaviors.has("pilgrim") && behaviors.has("greet"));
+assert.ok(behaviors.has("pace") && behaviors.has("wander") && behaviors.has("circuit"));
+assert.ok(!behaviors.has("still") && !behaviors.has("greet"));
 for (let i = 0; i < pop.npcs.length; i++) {
   const n = pop.npcs[i];
   assert.ok(isWalkable(world, n.tx, n.ty), n.name + " must stand on walkable ground");
 }
-const stillBefore = pop.npcs.filter((n) => n.behavior === "still").map((n) => n.tx + "," + n.ty);
-const mover = pop.npcs.find((n) => n.behavior === "pace" || n.behavior === "wander" || n.behavior === "pilgrim");
+const mover = pop.npcs.find((n) => n.behavior === "pace" || n.behavior === "wander");
 const moverBefore = mover.tx + "," + mover.ty;
 for (let i = 0; i < 40; i++) stepAll(pop, world, [{ tx: world.spawn.x, ty: world.spawn.y }], 100000 + i * 1000);
 for (let i = 0; i < pop.npcs.length; i++) {
   assert.ok(isWalkable(world, pop.npcs[i].tx, pop.npcs[i].ty), pop.npcs[i].name + " left the path");
 }
-const stillAfter = pop.npcs.filter((n) => n.behavior === "still").map((n) => n.tx + "," + n.ty);
-assert.deepStrictEqual(stillAfter, stillBefore, "sitting yogis stay on their mat");
 assert.notStrictEqual(pop.npcs.find((n) => n.id === mover.id).tx + "," + pop.npcs.find((n) => n.id === mover.id).ty, moverBefore, "a walking yogi should leave the first tile");
 
 section("tile engine (1000×1000)");
@@ -180,28 +178,33 @@ section("fastify + websocket + auth");
   assert.strictEqual(health.world.size, 1000);
   assert.ok((health.world.temples || []).length >= 7);
   assert.strictEqual(health.max, MAX_PLAYERS);
-  assert.strictEqual(health.npcs, 30);
+  assert.strictEqual(health.npcs, 6);
+
+  const closedRegister = await fetch("http://127.0.0.1:" + port + "/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+  assert.strictEqual(closedRegister.status, 404, "standalone game register is gone");
+  const closedLogin = await fetch("http://127.0.0.1:" + port + "/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+  assert.strictEqual(closedLogin.status, 404, "standalone game login is gone");
 
   const suffix = String(Date.now() % 100000);
-  const reg = await fetch("http://127.0.0.1:" + port + "/api/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "Mira" + suffix,
-      password: "om1234",
-      gender: "female",
-      focus: "bhakti",
-      asanas: ["padma", "surya"]
-    })
-  }).then((r) => r.json());
-  assert.ok(reg.token, "register returns token");
+  const store = app.hyrule.store;
+  const reg = store.register({
+    name: "Mira" + suffix,
+    password: "om1234",
+    gender: "female",
+    focus: "bhakti",
+    asanas: ["padma", "surya"]
+  });
+  assert.ok(!reg.error, reg.error);
   assert.strictEqual(reg.account.gender, "female");
-
-  const login = await fetch("http://127.0.0.1:" + port + "/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "Mira" + suffix, password: "om1234" })
-  }).then((r) => r.json());
+  const login = { token: store.createSession(reg.account), account: reg.account };
   assert.ok(login.token);
 
   const cal = await fetch("http://127.0.0.1:" + port + "/api/calendar", {
@@ -217,7 +220,7 @@ section("fastify + websocket + auth");
   assert.ok(joinedFest.festival.mine);
   assert.ok(joinedFest.festival.mine.booked.indexOf("dawn") >= 0);
 
-  function openPlayer(name) {
+  function openGuest(name) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket("ws://127.0.0.1:" + port + "/ws");
       const inbox = [];
@@ -235,6 +238,18 @@ section("fastify + websocket + auth");
       };
       wait();
     });
+  }
+
+  function sessionFor(name) {
+    const created = store.register({
+      name,
+      password: "om1234",
+      gender: "male",
+      focus: "hatha",
+      asanas: ["tadasana"]
+    });
+    assert.ok(!created.error, created.error);
+    return store.createSession(created.account);
   }
 
   function openAuth(token) {
@@ -255,6 +270,11 @@ section("fastify + websocket + auth");
     });
   }
 
+  const guest = await openGuest("Elmo");
+  assert.strictEqual(guest.welcome.t, "error");
+  assert.strictEqual(guest.welcome.code, "auth");
+  guest.ws.close();
+
   const sessions = [];
   const authed = await openAuth(login.token);
   assert.strictEqual(authed.welcome.t, "welcome");
@@ -263,12 +283,12 @@ section("fastify + websocket + auth");
   sessions.push(authed);
 
   for (let i = 0; i < 4; i++) {
-    const s = await openPlayer("Yogi" + (i + 1));
+    const s = await openAuth(sessionFor("Yogi" + suffix + (i + 1)));
     assert.strictEqual(s.welcome.t, "welcome", "player " + (i + 1) + " should join");
     sessions.push(s);
   }
 
-  const sixth = await openPlayer("ZuViel");
+  const sixth = await openAuth(sessionFor("ZuViel" + suffix));
   assert.strictEqual(sixth.welcome.t, "error");
   assert.strictEqual(sixth.welcome.code, "full");
   sixth.ws.close();

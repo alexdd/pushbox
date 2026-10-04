@@ -2,9 +2,8 @@
  * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
  * All rights reserved.
  *
- * Thirty ashram residents. Each one has a yoga practice and a small
- * behavior: sit, pace, wander, circle a temple, walk the pilgrimage,
- * or greet whoever comes near. The server ticks them; clients only draw.
+ * A handful of ashram residents who walk the grounds. The server ticks
+ * them; clients only draw.
  */
 "use strict";
 
@@ -20,38 +19,14 @@
   const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   const COLORS = ["#d4a574", "#7dcea0", "#c8965f", "#85c1e9", "#f5cba7", "#bb8fce", "#f1948a", "#73c6b6"];
 
-  /* behavior, focus, gender, home deity (or "spawn"), tempo in ticks, lines */
+  /* name, behavior, focus, gender, home deity (or "spawn"), tempo, lines */
   const CAST = [
-    ["Meera", "still", "meditation", "female", "shiva", 12, ["Ich sitze. Der Atem zählt, nicht die Schritte.", "Ein. Aus. Der Platz bleibt."]],
-    ["Arun", "circuit", "vinyasa", "male", "ganesha", 2, ["Surya Namaskar, Runde drei.", "Fließend, nicht hetzen."]],
-    ["Devi", "pilgrim", "bhakti", "female", "kali", 3, ["Der Pfad von Tempel zu Tempel ist schon das Gebet.", "Jaya, weiter."]],
-    ["Hari", "pace", "hatha", "male", "shiva", 3, ["Ein Schritt, eine Haltung.", "Der Pfad trägt."]],
-    ["Lila", "still", "yin", "female", "lakshmi", 16, ["Wir halten. Nichts muss sich bewegen.", "Die Hüfte darf weich bleiben."]],
-    ["Nanda", "wander", "ashtanga", "male", "hanuman", 1, ["Fünf Atemzüge, dann die nächste Reihe.", "Dranbleiben."]],
-    ["Sita", "still", "pranayama", "female", "saraswati", 10, ["Einatmen vier, halten vier, ausatmen sechs.", "Die Stimme kommt aus der Stille."]],
-    ["Govinda", "wander", "bhakti", "male", "krishna", 3, ["Die Flöte ist leise, der Schritt auch.", "Radhe, nur im Vorbeigehen."]],
-    ["Anjali", "greet", "hatha", "female", "spawn", 6, ["Namaste. Der Platz am Feuer ist frei.", "Willkommen im Kailash."]],
-    ["Ravi", "circuit", "hatha", "male", "hanuman", 2, ["Krieger, dann Berg.", "Kraft ohne Härte."]],
-    ["Padma", "still", "bhakti", "female", "lakshmi", 14, ["Der Lotus öffnet sich nicht auf Befehl.", "Danke, dass der Boden trägt."]],
-    ["Tara", "pace", "meditation", "female", "kali", 4, ["Kurz und klar. Dann wieder sitzen.", "Die Sichel mäht nur das Überflüssige."]],
-    ["Omkar", "wander", "meditation", "male", "shiva", 6, ["…", "Om, kaum laut."]],
-    ["Bhavana", "circuit", "hatha", "female", "ganesha", 3, ["Füße parallel. Knie weich.", "Schaut auf den eigenen Teppich, nicht auf mich."]],
-    ["Chandra", "still", "yin", "male", "saraswati", 18, ["Der Mond hat keine Eile.", "Heute nur die lange Seite."]],
-    ["Isha", "pace", "pranayama", "female", "spawn", 3, ["Ein Atemzug pro Brückenschritt.", "Ufer, Mitte, Ufer."]],
-    ["Mohan", "wander", "hatha", "male", "lakshmi", 4, ["Erst gießen, dann üben.", "Die Hütte braucht auch einen Rücken."]],
-    ["Jyoti", "circuit", "bhakti", "female", "shiva", 3, ["Die Lampe einmal um den Schrein.", "Licht bleibt, auch wenn ich weitergehe."]],
-    ["Keshav", "pilgrim", "ashtanga", "male", "hanuman", 2, ["Nächster Tempel, gleiche Serie.", "Die Straße ist die Praxis."]],
-    ["Radha", "wander", "vinyasa", "female", "krishna", 2, ["Drehen, nicht stolpern.", "Der Kreis ist ein Tanz, kein Wettkampf."]],
-    ["Vimal", "still", "yin", "male", "spawn", 20, ["Savasana. Augen zu, auch mitten auf dem Platz.", "Nichts tun ist die Haltung."]],
-    ["Surya", "pace", "vinyasa", "male", "ganesha", 2, ["Nach Osten, solange der Weg hält.", "Sonne im Gesicht, Ferse am Boden."]],
-    ["Ganga", "wander", "pranayama", "female", "kali", 4, ["Am Wasser wird der Atem länger.", "Nicht ins Nass, nur bis an den Rand."]],
-    ["Durga", "pace", "hatha", "female", "kali", 3, ["Ich gehe die Schwelle ab.", "Wer eintritt, grüßt erst."]],
-    ["Nataraj", "circuit", "meditation", "male", "shiva", 5, ["Der Tanz ist innen.", "Ein langsamer Kreis um den Berg."]],
-    ["Asha", "greet", "bhakti", "female", "spawn", 5, ["Tee steht in der Hütte, der Pfad ist offen.", "Namaste, bleib so lange du magst."]],
-    ["Prem", "wander", "bhakti", "male", "krishna", 2, ["Sing leise, dann hört man die anderen.", "Jeder Name ist ein Schritt."]],
-    ["Shanti", "still", "yin", "female", "lakshmi", 15, ["Unter dem Dach ist Schatten genug.", "Schultern runter."]],
-    ["Bodhi", "wander", "meditation", "male", "saraswati", 7, ["Langsam ist nicht verloren.", "Ich gehe, als säße ich."]],
-    ["Uma", "circuit", "ashtanga", "female", "lakshmi", 2, ["Stehender Bogen, dann Baum.", "Zählt mit, wenn ihr wollt."]]
+    ["Anjali", "wander", "hatha", "female", "spawn", 2, ["Namaste. Der Platz am Feuer ist frei."]],
+    ["Arun", "pace", "vinyasa", "male", "ganesha", 2, ["Surya Namaskar, ein Schritt nach dem anderen."]],
+    ["Devi", "circuit", "bhakti", "female", "shiva", 2, ["Einmal um den Tempel, dann weiter."]],
+    ["Hari", "wander", "hatha", "male", "hanuman", 2, ["Der Pfad trägt."]],
+    ["Meera", "pace", "meditation", "female", "lakshmi", 2, ["Ein. Aus. Und weitergehen."]],
+    ["Nanda", "wander", "ashtanga", "male", "kali", 2, ["Dranbleiben."]]
   ];
 
   function rngOf(seed) {

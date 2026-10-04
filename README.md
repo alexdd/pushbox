@@ -8,8 +8,8 @@ collection.
 
 This branch is a plain **HTML5 / JavaScript** port of PushBox, plus a **Yoga Event
 Area**: the same isometric tile engine scaled to a **1000×1000** ashram overworld
-(temples, symbolic Devatas, festivals). Fastify + WebSockets: register/login,
-calendar, private yogi chat, up to **5** wanderers online.
+(temples, symbolic Devatas, festivals). Fastify + WebSockets: yoga-website
+login, calendar, private yogi chat, up to **5** wanderers online.
 
 ## Run locally
 
@@ -67,7 +67,7 @@ PushBox:
 
 Yoga Event Area (`/zelda/`):
 
-- Register (Yogini/Yogi, Lieblingsasanas, Schwerpunkt) or log in.
+- Log in with a yoga-website account.
 - Walk between temples (Shiva, Kali, Ganesha, Lakshmi, Saraswati, Hanuman, Krishna).
 - Open the calendar, sign up for a festival, book sessions, invite another yogi.
 - Click a wandering yogi to open a private real-time chat.
