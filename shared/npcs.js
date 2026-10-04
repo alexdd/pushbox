@@ -12,8 +12,8 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   root.AshramNpcs = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const World = (typeof ZeldaWorld !== "undefined")
-    ? ZeldaWorld
+  const World = (typeof AshramWorld !== "undefined")
+    ? AshramWorld
     : (typeof require === "function" ? require("./world") : null);
 
   const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];

@@ -20,12 +20,12 @@ python3 -m http.server 8000
 # open http://localhost:8000/index.html
 ```
 
-Yoga Event Area (serves PushBox and `/zelda/`):
+Yoga Event Area (serves PushBox and `/ashram/`):
 
 ```bash
 npm install
 npm start
-# open http://localhost:3000/zelda/
+# open http://localhost:3000/ashram/
 ```
 
 Embed mode (for iframes): `index.html?embed=1`
@@ -34,7 +34,7 @@ Embed mode (for iframes): `index.html?embed=1`
 
 ```bash
 node tools/headless_test.js
-node tools/zelda_test.js
+node tools/ashram_test.js
 node --check js/*.js
 ```
 
@@ -50,7 +50,7 @@ node --check js/*.js
 | `js/levels.js` | Embedded level data (33 stages) |
 | `tools/headless_test.js` | Headless smoke test + solver check |
 | `tools/solver.js` | BFS solver driving the real engine |
-| `zelda/` | Hyrule prototype (login, touch pad, isometric client) |
+| `ashram/` | Yoga ashram client (login, touch pad, isometric view) |
 | `shared/world.js` | Deterministic 1000×1000 overworld (rivers, bridges, villages) |
 | `server/index.js` | Fastify + WebSocket MMORPG backend (max 5 players) |
 
@@ -65,7 +65,7 @@ PushBox:
 - Space / Enter = fire (advance menus / select a stage).
 - Flow: **title → fire → pick a stage → fire → push every crate onto a target tile.**
 
-Yoga Event Area (`/zelda/`):
+Yoga Event Area (locally `/ashram/`, on the site `/yoga-spiel/`):
 
 - Log in with a yoga-website account.
 - Walk between temples (Shiva, Kali, Ganesha, Lakshmi, Saraswati, Hanuman, Krishna).

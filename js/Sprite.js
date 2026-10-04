@@ -327,7 +327,7 @@ Sprite.SPEED = 4;
 Sprite.TILE_STEPS_DY = 12;
 Sprite.TILE_STEPS = Sprite.TILE_STEPS_DY;
 // TILE_X / TILE_Y match PushBoxCanvas tile size (48x24 diamonds → 24 / 12).
-// Fallback lets the Zelda prototype reuse Sprite.js without loading PushBoxCanvas.
+// Fallback lets the ashram reuse Sprite.js without loading PushBoxCanvas.
 Sprite.TILE_X = (typeof PushBoxCanvas !== "undefined") ? (PushBoxCanvas.TILE_DX >> 1) : 24;
 Sprite.TILE_Y = (typeof PushBoxCanvas !== "undefined") ? (PushBoxCanvas.TILE_DY >> 1) : 12;
 Sprite.STATE_IDLE = 0;

@@ -12,7 +12,7 @@
 (function (root, factory) {
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
-  root.ZeldaWorld = api;
+  root.AshramWorld = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
 
   const Catalog = (typeof YogaCatalog !== "undefined")

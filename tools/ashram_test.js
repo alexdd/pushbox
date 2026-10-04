@@ -1,7 +1,7 @@
 /*
  * Headless checks for the Yoga Event Area:
  *   1. 1000×1000 world has rivers, temples, deities, walkable spawn
- *   2. ZeldaCanvas loads and the yogi can take a step
+ *   2. AshramCanvas loads and the yogi can take a step
  *   3. Fastify: 5 online, 6th rejected; register/login; whisper; festival join
  */
 "use strict";
@@ -94,7 +94,7 @@ const sandbox = {
   document: documentStub,
   requestAnimationFrame() {},
   console,
-  ZeldaWorld: require("../shared/world"),
+  AshramWorld: require("../shared/world"),
   YogaCatalog: require("../shared/catalog")
 };
 vm.createContext(sandbox);
@@ -104,18 +104,18 @@ const load = (rel) => {
 };
 load("js/runtime.js");
 load("js/Sprite.js");
-load("zelda/js/assets.js");
-load("zelda/js/ZeldaCanvas.js");
+load("ashram/js/assets.js");
+load("ashram/js/AshramCanvas.js");
 
 const engineOut = vm.runInContext(`
   const screen = document.getElementById("screen");
-  const engine = new ZeldaCanvas(screen);
+  const engine = new AshramCanvas(screen);
   engine.resize(320, 208);
   const assets = buildHyruleAssets();
-  const world = ZeldaWorld.generateWorld(1998, 1000);
+  const world = AshramWorld.generateWorld(1998, 1000);
   engine.loadWorld(world, assets);
   engine.spawnLocal({ id: 1, name: "Test", slot: 0, color: "#c45c26", gender: "female", tx: world.spawn.x, ty: world.spawn.y, dir: 2 });
-  engine.state = ZeldaCanvas.STATE_GAME;
+  engine.state = AshramCanvas.STATE_GAME;
   const before = { x: engine.player.tileX, y: engine.player.tileY };
   engine.RIGHT = true;
   for (let i = 0; i < 20; i++) engine.step();
@@ -136,7 +136,7 @@ const engineOut = vm.runInContext(`
   let onScreen = 0;
   for (let i = 0; i < engine.props.length; i++) {
     const p = engine.props[i];
-    if (!ZeldaCanvas.isOnScreen(engine, p)) continue;
+    if (!AshramCanvas.isOnScreen(engine, p)) continue;
     onScreen++;
     if (!painted.has(p)) missing++;
   }
@@ -325,7 +325,7 @@ section("fastify + websocket + auth");
   for (const s of sessions) s.ws.close();
   await app.close();
 
-  console.log("zelda_test: ok");
+  console.log("ashram_test: ok");
   console.log("  world", world.stats);
   console.log("  temples", world.temples.map((t) => t.deity + "@" + t.x + "," + t.y).join(" "));
   console.log("  engine moved from", engineOut.spawn);

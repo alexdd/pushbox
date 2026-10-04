@@ -6,8 +6,8 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "test": "node tools/headless_test.js && node tools/zelda_test.js",
-    "check": "node --check js/*.js && node --check zelda/js/*.js && node --check server/*.js && node --check shared/*.js"
+    "test": "node tools/headless_test.js && node tools/ashram_test.js",
+    "check": "node --check js/*.js && node --check ashram/js/*.js && node --check server/*.js && node --check shared/*.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
  * All rights reserved.
  *
- * ZeldaCanvas — the PushBox isometric tile engine, scaled to a 1000×1000
+ * AshramCanvas — the PushBox isometric tile engine, scaled to a 1000×1000
  * overworld. Ground tiles use a camera window and painter's order
  * (back to front by tileX + tileY). The 2005 diamond walker remains in
  * PushBoxCanvas for the sokoban levels.
@@ -46,7 +46,7 @@ class Prop {
   }
 }
 
-class ZeldaCanvas {
+class AshramCanvas {
   constructor(canvas) {
     this.canvasEl = canvas;
     this.viewW = 320;
@@ -56,9 +56,9 @@ class ZeldaCanvas {
     this.UP = false; this.DOWN = false; this.LEFT = false; this.RIGHT = false;
     this.release = false;
     this.frameTime = 0;
-    this.frame_time = ZeldaCanvas.FRAMERATE_GAME;
+    this.frame_time = AshramCanvas.FRAMERATE_GAME;
     this.tick = 0;
-    this.state = ZeldaCanvas.STATE_LOADING;
+    this.state = AshramCanvas.STATE_LOADING;
 
     this.size_map = 0;
     this.width_map = 0;
@@ -76,8 +76,8 @@ class ZeldaCanvas {
     this.x = 0; this.y = 0; this.index = 0; this.row = 0; this.rOff = 0;
     this.slide = 0; this.rLen = 0;
 
-    this.VP_TILES_WIDTH = ZeldaCanvas.VP_TILES_WIDTH;
-    this.VP_TILES_HEIGHT = ZeldaCanvas.VP_TILES_HEIGHT;
+    this.VP_TILES_WIDTH = AshramCanvas.VP_TILES_WIDTH;
+    this.VP_TILES_HEIGHT = AshramCanvas.VP_TILES_HEIGHT;
 
     this.world = null;
     this.tiles = null;
@@ -111,17 +111,17 @@ class ZeldaCanvas {
     this.canvasEl.width = this.viewW;
     this.canvasEl.height = this.viewH;
     this.g = new Graphics(this.canvasEl.getContext("2d"), this.viewW, this.viewH);
-    this.VP_TILES_WIDTH = Math.ceil(this.viewW / ZeldaCanvas.TILE_DX) + 3;
-    this.VP_TILES_HEIGHT = Math.ceil(this.viewH / (ZeldaCanvas.TILE_DY >> 1)) + 6;
+    this.VP_TILES_WIDTH = Math.ceil(this.viewW / AshramCanvas.TILE_DX) + 3;
+    this.VP_TILES_HEIGHT = Math.ceil(this.viewH / (AshramCanvas.TILE_DY >> 1)) + 6;
     if (this.player) this.setCamera(this.player.x, this.player.y);
   }
 
   tile_x(tileX, tileY) {
-    return ((tileX - tileY) * (ZeldaCanvas.TILE_DX >> 1)) + this.top_map;
+    return ((tileX - tileY) * (AshramCanvas.TILE_DX >> 1)) + this.top_map;
   }
 
   tile_y(tileX, tileY) {
-    return (tileX + tileY) * (ZeldaCanvas.TILE_DY >> 1);
+    return (tileX + tileY) * (AshramCanvas.TILE_DY >> 1);
   }
 
   getTile(tileX, tileY) {
@@ -132,7 +132,7 @@ class ZeldaCanvas {
   tile_accessible(o, tileX, tileY) {
     if (tileX < 0 || tileX >= this.width_map || tileY < 0 || tileY >= this.height_map) return false;
     const tile = this.tiles[tileX + (tileY * this.width_map)];
-    if (!ZeldaWorld.isWalkableTile(tile)) return false;
+    if (!AshramWorld.isWalkableTile(tile)) return false;
     const hit = this.getObjectSuperType(tileX, tileY);
     if (hit && hit !== o && hit !== this.player) return false;
     return true;
@@ -157,10 +157,10 @@ class ZeldaCanvas {
     this.row = this.cam_gridY << 1;
     this.rOff = this.cam_gridX + this.cam_gridY;
 
-    if (this.otx < (ZeldaCanvas.TILE_DX >> 1)) {
-      if (this.oty < (ZeldaCanvas.TILE_DY >> 1)) {
-        this.x -= ZeldaCanvas.TILE_DX >> 1;
-        this.y -= ZeldaCanvas.TILE_DY >> 1;
+    if (this.otx < (AshramCanvas.TILE_DX >> 1)) {
+      if (this.oty < (AshramCanvas.TILE_DY >> 1)) {
+        this.x -= AshramCanvas.TILE_DX >> 1;
+        this.y -= AshramCanvas.TILE_DY >> 1;
         this.index--;
         this.row--;
         this.rOff--;
@@ -169,9 +169,9 @@ class ZeldaCanvas {
         this.slide = 0;
       }
     } else {
-      if (this.oty < (ZeldaCanvas.TILE_DY >> 1)) {
-        this.x += ZeldaCanvas.TILE_DX >> 1;
-        this.y -= ZeldaCanvas.TILE_DY >> 1;
+      if (this.oty < (AshramCanvas.TILE_DY >> 1)) {
+        this.x += AshramCanvas.TILE_DX >> 1;
+        this.y -= AshramCanvas.TILE_DY >> 1;
         this.index -= this.width_map;
         this.row--;
         this.slide = 0;
@@ -183,25 +183,25 @@ class ZeldaCanvas {
 
   setCamGrid() {
     if (this.camX >= 0) {
-      this.cam_gridX = (this.camX / ZeldaCanvas.TILE_DX) | 0;
-      this.otx = this.camX - (this.cam_gridX * ZeldaCanvas.TILE_DX);
+      this.cam_gridX = (this.camX / AshramCanvas.TILE_DX) | 0;
+      this.otx = this.camX - (this.cam_gridX * AshramCanvas.TILE_DX);
     } else {
-      this.cam_gridX = -(((1 - this.camX) / ZeldaCanvas.TILE_DX) | 0);
-      this.otx = ZeldaCanvas.TILE_DX + this.camX - (this.cam_gridX * ZeldaCanvas.TILE_DX);
+      this.cam_gridX = -(((1 - this.camX) / AshramCanvas.TILE_DX) | 0);
+      this.otx = AshramCanvas.TILE_DX + this.camX - (this.cam_gridX * AshramCanvas.TILE_DX);
       this.cam_gridX--;
     }
     if (this.camY >= 0) {
-      this.cam_gridY = (this.camY / ZeldaCanvas.TILE_DY) | 0;
-      this.oty = this.camY - (this.cam_gridY * ZeldaCanvas.TILE_DY);
+      this.cam_gridY = (this.camY / AshramCanvas.TILE_DY) | 0;
+      this.oty = this.camY - (this.cam_gridY * AshramCanvas.TILE_DY);
     } else {
-      this.cam_gridY = -(((1 - this.camY) / ZeldaCanvas.TILE_DY) | 0);
-      this.oty = ZeldaCanvas.TILE_DY + this.camY - (this.cam_gridY * ZeldaCanvas.TILE_DY);
+      this.cam_gridY = -(((1 - this.camY) / AshramCanvas.TILE_DY) | 0);
+      this.oty = AshramCanvas.TILE_DY + this.camY - (this.cam_gridY * AshramCanvas.TILE_DY);
       this.cam_gridY--;
     }
     if ((this.height_map & 0x1) === 0) {
-      this.otx += (ZeldaCanvas.TILE_DX >> 1);
-      if (this.otx >= ZeldaCanvas.TILE_DX) {
-        this.otx -= ZeldaCanvas.TILE_DX;
+      this.otx += (AshramCanvas.TILE_DX >> 1);
+      if (this.otx >= AshramCanvas.TILE_DX) {
+        this.otx -= AshramCanvas.TILE_DX;
         this.cam_gridX++;
       }
     }
@@ -210,10 +210,10 @@ class ZeldaCanvas {
   nextXY() {
     if (this.slide === 1) {
       this.index++;
-      this.x += ZeldaCanvas.TILE_DX >> 1;
+      this.x += AshramCanvas.TILE_DX >> 1;
     } else {
       this.index += this.width_map;
-      this.x -= ZeldaCanvas.TILE_DX >> 1;
+      this.x -= AshramCanvas.TILE_DX >> 1;
     }
     if (this.row < this.high_corner) this.rLen++;
     else if (this.row >= this.low_corner) this.rLen--;
@@ -270,8 +270,8 @@ class ZeldaCanvas {
   }
 
   cullRadius() {
-    const tilesX = Math.ceil(this.viewW / (ZeldaCanvas.TILE_DX >> 1));
-    const tilesY = Math.ceil(this.viewH / (ZeldaCanvas.TILE_DY >> 1));
+    const tilesX = Math.ceil(this.viewW / (AshramCanvas.TILE_DX >> 1));
+    const tilesY = Math.ceil(this.viewH / (AshramCanvas.TILE_DY >> 1));
     // Temples rise ~160px above their footprint, so the cull box has to
     // reach past the screen edge or roofs vanish while walking.
     return tilesX + tilesY + 18;
@@ -319,9 +319,9 @@ class ZeldaCanvas {
     this.width_map = world.size;
     this.height_map = world.size;
 
-    this.px_width = ((this.width_map + this.height_map) * ((ZeldaCanvas.TILE_WIDTH >> 1) + 1)) - 2;
-    this.px_height = (this.width_map + this.height_map) * (ZeldaCanvas.TILE_HEIGHT >> 1);
-    this.top_map = (this.height_map - 1) * ((ZeldaCanvas.TILE_WIDTH >> 1) + 1);
+    this.px_width = ((this.width_map + this.height_map) * ((AshramCanvas.TILE_WIDTH >> 1) + 1)) - 2;
+    this.px_height = (this.width_map + this.height_map) * (AshramCanvas.TILE_HEIGHT >> 1);
+    this.top_map = (this.height_map - 1) * ((AshramCanvas.TILE_WIDTH >> 1) + 1);
 
     if (this.width_map <= this.height_map) {
       this.max_row = this.width_map;
@@ -333,10 +333,10 @@ class ZeldaCanvas {
       this.low_corner = this.width_map - 1;
     }
 
-    this.min_camX = -ZeldaCanvas.BORDER_W;
-    this.min_camY = -ZeldaCanvas.BORDER_N;
-    this.max_camX = (this.px_width + ZeldaCanvas.BORDER_E) - this.viewW;
-    this.max_camY = (this.px_height + ZeldaCanvas.BORDER_S) - this.viewH;
+    this.min_camX = -AshramCanvas.BORDER_W;
+    this.min_camY = -AshramCanvas.BORDER_N;
+    this.max_camX = (this.px_width + AshramCanvas.BORDER_E) - this.viewW;
+    this.max_camY = (this.px_height + AshramCanvas.BORDER_S) - this.viewH;
     if (this.max_camX < 0) this.max_camX = 0;
     if (this.max_camY < 0) this.max_camY = 0;
 
@@ -527,7 +527,7 @@ class ZeldaCanvas {
   }
 
   processKeys() {
-    if (!this.player || this.state !== ZeldaCanvas.STATE_GAME) return;
+    if (!this.player || this.state !== AshramCanvas.STATE_GAME) return;
     if (this.UP) this.player.setKeys(Sprite.DIR_NORTH);
     else if (this.DOWN) this.player.setKeys(Sprite.DIR_SOUTH);
     else if (this.LEFT) this.player.setKeys(Sprite.DIR_WEST);
@@ -561,7 +561,7 @@ class ZeldaCanvas {
   step() {
     this.frameTime = this.frame_time;
     this.processKeys();
-    if (this.state === ZeldaCanvas.STATE_GAME) this.update();
+    if (this.state === AshramCanvas.STATE_GAME) this.update();
     this.tick++;
     if (this.tick > 100000) this.tick = 0;
   }
@@ -569,13 +569,13 @@ class ZeldaCanvas {
   tileImage(tile, tx, ty) {
     const a = this.assets.tiles;
     switch (tile) {
-      case ZeldaWorld.TILE.PATH: return a.path;
-      case ZeldaWorld.TILE.WATER: return a.water[(this.tick >> 3) & 1];
-      case ZeldaWorld.TILE.BRIDGE: return a.bridge;
-      case ZeldaWorld.TILE.SAND: return a.sand;
-      case ZeldaWorld.TILE.FLOWER: return a.flower;
-      case ZeldaWorld.TILE.WALL: return a.wall;
-      case ZeldaWorld.TILE.FLOOR: return a.floor;
+      case AshramWorld.TILE.PATH: return a.path;
+      case AshramWorld.TILE.WATER: return a.water[(this.tick >> 3) & 1];
+      case AshramWorld.TILE.BRIDGE: return a.bridge;
+      case AshramWorld.TILE.SAND: return a.sand;
+      case AshramWorld.TILE.FLOWER: return a.flower;
+      case AshramWorld.TILE.WALL: return a.wall;
+      case AshramWorld.TILE.FLOOR: return a.floor;
       default: return a.grass[(tx * 13 + ty * 7) % 3];
     }
   }
@@ -589,8 +589,8 @@ class ZeldaCanvas {
      The 2005 diamond walker stays in PushBoxCanvas for the sokoban levels.
      Here it dropped tall roofs and any sprite painted after a setClip. */
   visibleTiles() {
-    const halfW = ZeldaCanvas.TILE_DX >> 1;
-    const halfH = ZeldaCanvas.TILE_DY >> 1;
+    const halfW = AshramCanvas.TILE_DX >> 1;
+    const halfH = AshramCanvas.TILE_DY >> 1;
     const margin = 3;
     const corners = [
       [this.camX - halfW, this.camY - halfH],
@@ -642,7 +642,7 @@ class ZeldaCanvas {
     const draw = [];
     for (let i = 0; i < this.visibleProps.length; i++) {
       const p = this.visibleProps[i];
-      if (ZeldaCanvas.isOnScreen(this, p)) draw.push(p);
+      if (AshramCanvas.isOnScreen(this, p)) draw.push(p);
     }
     if (this.player) draw.push(this.player);
     for (const remote of this.remotes.values()) draw.push(remote);
@@ -721,7 +721,7 @@ class ZeldaCanvas {
 
   paint() {
     this.g.setClip(0, 0, this.viewW, this.viewH);
-    if (this.state === ZeldaCanvas.STATE_LOADING) {
+    if (this.state === AshramCanvas.STATE_LOADING) {
       this.g.setColor(18, 46, 28);
       this.g.fillRect(0, 0, this.viewW, this.viewH);
       return;
@@ -764,16 +764,16 @@ class ZeldaCanvas {
   }
 }
 
-ZeldaCanvas.TILE_WIDTH = 46;
-ZeldaCanvas.TILE_HEIGHT = 24;
-ZeldaCanvas.TILE_DX = ZeldaCanvas.TILE_WIDTH + 2;
-ZeldaCanvas.TILE_DY = ZeldaCanvas.TILE_HEIGHT;
-ZeldaCanvas.VP_TILES_WIDTH = 8;
-ZeldaCanvas.VP_TILES_HEIGHT = 28;
-ZeldaCanvas.BORDER_N = 20;
-ZeldaCanvas.BORDER_S = 10;
-ZeldaCanvas.BORDER_E = 10;
-ZeldaCanvas.BORDER_W = 10;
-ZeldaCanvas.FRAMERATE_GAME = 40;
-ZeldaCanvas.STATE_LOADING = 0;
-ZeldaCanvas.STATE_GAME = 1;
+AshramCanvas.TILE_WIDTH = 46;
+AshramCanvas.TILE_HEIGHT = 24;
+AshramCanvas.TILE_DX = AshramCanvas.TILE_WIDTH + 2;
+AshramCanvas.TILE_DY = AshramCanvas.TILE_HEIGHT;
+AshramCanvas.VP_TILES_WIDTH = 8;
+AshramCanvas.VP_TILES_HEIGHT = 28;
+AshramCanvas.BORDER_N = 20;
+AshramCanvas.BORDER_S = 10;
+AshramCanvas.BORDER_E = 10;
+AshramCanvas.BORDER_W = 10;
+AshramCanvas.FRAMERATE_GAME = 40;
+AshramCanvas.STATE_LOADING = 0;
+AshramCanvas.STATE_GAME = 1;

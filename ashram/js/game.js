@@ -116,8 +116,11 @@ function updateHud() {
 
 function apiBase() {
   const path = location.pathname;
-  const at = path.indexOf("/zelda");
-  return at > 0 ? path.slice(0, at).replace(/\/$/, "") : "";
+  const spiel = path.indexOf("/yoga-spiel");
+  if (spiel >= 0) return path.slice(0, spiel) + "/yoga-spiel";
+  const at = path.indexOf("/ashram");
+  if (at > 0) return path.slice(0, at).replace(/\/$/, "");
+  return "";
 }
 
 function api(path) {
@@ -274,7 +277,7 @@ function onMessage(msg) {
   const e = Hyrule.engine;
   switch (msg.t) {
     case "welcome":
-      Hyrule.world = ZeldaWorld.generateWorld(msg.world.seed, msg.world.size);
+      Hyrule.world = AshramWorld.generateWorld(msg.world.seed, msg.world.size);
       Hyrule.calendar = msg.calendar || [];
       Hyrule.catalog = msg.catalog || Hyrule.catalog;
       e.loadWorld(Hyrule.world, Hyrule.assets);
@@ -282,7 +285,7 @@ function onMessage(msg) {
       for (let i = 0; i < msg.players.length; i++) e.upsertRemote(msg.players[i]);
       const residents = msg.npcs || [];
       for (let i = 0; i < residents.length; i++) e.upsertNpc(residents[i]);
-      e.state = ZeldaCanvas.STATE_GAME;
+      e.state = AshramCanvas.STATE_GAME;
       Hyrule.joined = true;
       enterWorld();
       setStatus(msg.player.name + " betritt den Ashram");
@@ -537,7 +540,7 @@ function startLoop() {
 
 function boot() {
   const screen = qs("screen");
-  Hyrule.engine = new ZeldaCanvas(screen);
+  Hyrule.engine = new AshramCanvas(screen);
   Hyrule.assets = buildHyruleAssets();
   Hyrule.engine.assets = Hyrule.assets;
   fitView();

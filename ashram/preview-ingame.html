@@ -21,22 +21,22 @@
   <script src="/js/Sprite.js"></script>
   <script src="/shared/catalog.js"></script>
   <script src="/shared/world.js"></script>
-  <script src="/zelda/js/assets.js"></script>
-  <script src="/zelda/js/ZeldaCanvas.js"></script>
+  <script src="/ashram/js/assets.js"></script>
+  <script src="/ashram/js/AshramCanvas.js"></script>
   <script>
     const assets = buildHyruleAssets();
-    const world = ZeldaWorld.generateWorld(1998, 1000);
+    const world = AshramWorld.generateWorld(1998, 1000);
 
     function shot(canvasId, tx, ty, name) {
       const screen = document.getElementById(canvasId);
-      const engine = new ZeldaCanvas(screen);
+      const engine = new AshramCanvas(screen);
       engine.resize(480, 360);
       engine.loadWorld(world, assets);
       engine.spawnLocal({
         id: 1, name: name, slot: 0, color: "#c45c26", gender: "female",
         tx: tx, ty: ty, dir: 2
       });
-      engine.state = ZeldaCanvas.STATE_GAME;
+      engine.state = AshramCanvas.STATE_GAME;
       engine.paint();
       return engine;
     }

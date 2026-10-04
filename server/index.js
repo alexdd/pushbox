@@ -372,10 +372,22 @@ async function buildServer(opts) {
   });
 
   const root = path.join(__dirname, "..");
-  await app.register(require("@fastify/static"), {
+  const staticFiles = require("@fastify/static");
+  await app.register(staticFiles, {
+    root: path.join(root, "js"),
+    prefix: "/ashram/engine/",
+    decorateReply: false
+  });
+  await app.register(staticFiles, {
+    root: path.join(root, "shared"),
+    prefix: "/ashram/shared/",
+    decorateReply: false
+  });
+  await app.register(staticFiles, {
     root,
     prefix: "/",
-    index: ["index.html"]
+    index: ["index.html"],
+    decorateReply: false
   });
 
   app.decorate("hyrule", { world, players, MAX_PLAYERS, store });
@@ -390,7 +402,7 @@ async function main() {
     dataDir: process.env.DATA_DIR || undefined
   });
   await app.listen({ port, host });
-  app.log.info("Yoga Event Area at http://" + host + ":" + port + "/zelda/");
+  app.log.info("Yoga Event Area at http://" + host + ":" + port + "/ashram/");
 }
 
 if (require.main === module) {
