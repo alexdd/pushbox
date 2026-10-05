@@ -11,7 +11,7 @@
 const path = require("path");
 const Fastify = require("fastify");
 const { generateWorld, isWalkable, spawnForSlot, publicMeta } = require("../shared/world");
-const { createPopulation, stepAll, publicNpc } = require("../shared/npcs");
+const { createPopulation, stepAll, publicNpc, replyLine } = require("../shared/npcs");
 const Catalog = require("../shared/catalog");
 const { createStore } = require("./store");
 
@@ -63,6 +63,128 @@ async function buildServer(opts) {
   const players = new Map();
   let nextId = 1;
   const ashram = createPopulation(world);
+  let markers = [];
+
+  function hash32(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function spotFor(key, used) {
+    const h = hash32(String(key));
+    for (let i = 0; i < 60; i++) {
+      const x = 4 + ((h + i * 97) % (world.size - 8));
+      const y = 4 + (((Math.imul(h, 13) >>> 0) + i * 57) % (world.size - 8));
+      const id = x + "," + y;
+      if (used.has(id) || !isWalkable(world, x, y)) continue;
+      used.add(id);
+      return { x, y };
+    }
+    return { x: world.spawn.x + 2, y: world.spawn.y + 2 };
+  }
+
+  async function refreshMarkers() {
+    const videos = [];
+    const courses = [];
+    const yogaBase = (process.env.YOGA_API_BASE || "http://yoga:8001").replace(/\/$/, "");
+    const tadmin = (process.env.TADMIN_API_BASE || "http://tadmin:8000").replace(/\/$/, "");
+    try {
+      const res = await fetch(yogaBase + "/api/v1/yoga/courses-feed?limit=16");
+      if (res.ok) {
+        const rows = await res.json();
+        for (let i = 0; i < rows.length && courses.length < 8; i++) {
+          const row = rows[i];
+          if (!row || !row.title) continue;
+          courses.push({
+            id: "course-" + (row.id || i),
+            title: String(row.title).slice(0, 80),
+            when: row.starts_at || row.startsAt || "",
+            where: row.location || "",
+            text: row.description || ""
+          });
+        }
+      }
+    } catch (err) { /* yoga feed optional */ }
+    try {
+      const url = tadmin + "/api/v1/youtube-playlist/?playlist_id=PLWbqZmfWsGrdBQgc9y2KnxbW36lmCnvfB&max_results=8";
+      const res = await fetch(url);
+      if (res.ok) {
+        const body = await res.json();
+        const list = body.videos || body.results || body || [];
+        const rows = Array.isArray(list) ? list : [];
+        for (let i = 0; i < rows.length && videos.length < 8; i++) {
+          const row = rows[i];
+          const videoId = row.videoId || row.video_id || row.id;
+          if (!videoId || String(videoId).length > 20) continue;
+          videos.push({
+            id: "video-" + videoId,
+            videoId: String(videoId),
+            title: String(row.title || "Yoga-Video").slice(0, 80)
+          });
+        }
+      }
+    } catch (err) { /* playlist optional */ }
+    const used = new Set();
+    const next = [];
+    for (let i = 0; i < videos.length; i++) {
+      const at = spotFor(videos[i].id, used);
+      next.push({ kind: "video", tx: at.x, ty: at.y, id: videos[i].id, videoId: videos[i].videoId, title: videos[i].title });
+    }
+    for (let i = 0; i < courses.length; i++) {
+      const at = spotFor(courses[i].id, used);
+      next.push({
+        kind: "event",
+        tx: at.x,
+        ty: at.y,
+        id: courses[i].id,
+        title: courses[i].title,
+        when: courses[i].when,
+        where: courses[i].where,
+        text: courses[i].text
+      });
+    }
+    markers = next;
+    broadcast({ t: "markers", markers });
+  }
+
+  async function pullPosition(yogaUserId) {
+    const secret = process.env.INTERNAL_API_SECRET || "";
+    const base = (process.env.YOGA_API_BASE || "").replace(/\/$/, "");
+    if (!secret || !base || !yogaUserId) return null;
+    try {
+      const res = await fetch(base + "/api/v1/yoga/ashram-position/" + yogaUserId, {
+        headers: { "X-Internal-Secret": secret }
+      });
+      if (!res.ok) return null;
+      const body = await res.json();
+      if (!body || !Number.isFinite(body.tx)) return null;
+      return { x: body.tx | 0, y: body.ty | 0, dir: body.dir & 3 };
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function pushPosition(yogaUserId, tx, ty, dir) {
+    const secret = process.env.INTERNAL_API_SECRET || "";
+    const base = (process.env.YOGA_API_BASE || "").replace(/\/$/, "");
+    if (!secret || !base || !yogaUserId) return;
+    fetch(base + "/api/v1/yoga/ashram-position", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "X-Internal-Secret": secret },
+      body: JSON.stringify({ user_id: yogaUserId, tx, ty, dir })
+    }).catch(() => {});
+  }
+
+  function remember(me) {
+    if (!me || !me.accountId) return;
+    store.savePosition(me.accountId, me.tx, me.ty, me.dir);
+    const acc = store.accountById(me.accountId);
+    if (acc && acc.yogaUserId) pushPosition(acc.yogaUserId, me.tx, me.ty, me.dir);
+  }
 
   function npcSnapshot() {
     return ashram.npcs.map(publicNpc);
@@ -78,6 +200,9 @@ async function buildServer(opts) {
     }
   }
   const npcTimer = setInterval(tickNpcs, 420);
+  const markerTimer = setInterval(() => { refreshMarkers().catch(() => {}); }, 120000);
+  if (typeof markerTimer.unref === "function") markerTimer.unref();
+  refreshMarkers().catch(() => {});
   if (typeof npcTimer.unref === "function") npcTimer.unref();
 
   function usedSlots() {
@@ -129,7 +254,10 @@ async function buildServer(opts) {
       return null;
     }
     const slot = nextSlot();
-    const spawn = spawnForSlot(world, slot);
+    const saved = store.savedPosition(profile.accountId);
+    const spawn = saved && isWalkable(world, saved.x, saved.y)
+      ? saved
+      : Object.assign(spawnForSlot(world, slot), { dir: 2 });
     const me = {
       id: nextId++,
       accountId: profile.accountId || 0,
@@ -143,7 +271,7 @@ async function buildServer(opts) {
       y: 0,
       tx: spawn.x,
       ty: spawn.y,
-      dir: 2,
+      dir: spawn.dir == null ? 2 : spawn.dir & 3,
       moving: false,
       ws: socket
     };
@@ -156,7 +284,8 @@ async function buildServer(opts) {
       calendar: calendarPayload(me.accountId),
       catalog: { deities: Catalog.DEITIES, asanas: Catalog.ASANAS, foci: Catalog.FOCI },
       max: MAX_PLAYERS,
-      npcs: npcSnapshot()
+      npcs: npcSnapshot(),
+      markers
     });
     broadcast({ t: "join", player: publicPlayer(me) }, me.id);
     return me;
@@ -267,12 +396,18 @@ async function buildServer(opts) {
           send(socket, { t: "error", code: "auth", message: "Sitzung ungültig — bitte neu anmelden." });
           return;
         }
-        me = admit(socket, {
-          accountId: acc.id,
-          name: acc.name,
-          gender: acc.gender,
-          asanas: acc.asanas,
-          focus: acc.focus
+        pullPosition(acc.yogaUserId).then((remote) => {
+          if (remote && isWalkable(world, remote.x, remote.y)) {
+            store.savePosition(acc.id, remote.x, remote.y, remote.dir);
+          }
+          if (me) return;
+          me = admit(socket, {
+            accountId: acc.id,
+            name: acc.name,
+            gender: acc.gender,
+            asanas: acc.asanas,
+            focus: acc.focus
+          });
         });
         return;
       }
@@ -294,6 +429,7 @@ async function buildServer(opts) {
         me.dir = msg.dir & 3;
         me.moving = !!msg.moving;
         broadcast({ t: "move", player: publicPlayer(me) }, me.id);
+        remember(me);
         return;
       }
 
@@ -301,6 +437,22 @@ async function buildServer(opts) {
         const text = String(msg.text || "").trim().slice(0, 120);
         if (!text) return;
         broadcast({ t: "say", id: me.id, name: me.name, text }, null);
+        let nearest = null;
+        let best = 6;
+        for (let i = 0; i < ashram.npcs.length; i++) {
+          const n = ashram.npcs[i];
+          const dist = Math.abs(n.tx - me.tx) + Math.abs(n.ty - me.ty);
+          if (dist < best) { best = dist; nearest = n; }
+        }
+        if (nearest) {
+          broadcast({
+            t: "say",
+            id: nearest.id,
+            name: nearest.name,
+            text: replyLine(text, nearest.tx + nearest.ty),
+            npc: true
+          });
+        }
         return;
       }
 
@@ -367,7 +519,7 @@ async function buildServer(opts) {
       }
     });
 
-    socket.on("close", () => { if (me) leave(me.id, "disconnect"); });
+    socket.on("close", () => { if (me) { remember(me); leave(me.id, "disconnect"); } });
     socket.on("error", () => { if (me) leave(me.id, "error"); });
   });
 

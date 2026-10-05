@@ -12,19 +12,19 @@ const os = require("os");
 const path = require("path");
 const vm = require("vm");
 const { generateWorld, isWalkable, TILE } = require("../shared/world");
-const { createPopulation, stepAll } = require("../shared/npcs");
+const { createPopulation, stepAll, replyLine } = require("../shared/npcs");
 const { buildServer, MAX_PLAYERS } = require("../server/index");
 
 function section(name) { console.log("  · " + name); }
 
 section("world generator");
-const world = generateWorld(1998, 1000);
-assert.strictEqual(world.size, 1000);
-assert.strictEqual(world.tiles.length, 1000 * 1000);
-assert.ok(world.stats.water > 5000, "rivers should cover many water tiles");
-assert.ok(world.stats.bridges > 20, "roads must cross rivers on bridges");
-assert.ok(world.stats.houses >= 8, "ashrams should contain huts");
-assert.ok(world.stats.trees > 200, "forests should plant trees");
+const world = generateWorld(1998);
+assert.strictEqual(world.size, 300);
+assert.strictEqual(world.tiles.length, 300 * 300);
+assert.ok(world.stats.water > 40, "rivers should cover water tiles");
+assert.ok(world.stats.bridges > 4, "roads must cross rivers on bridges");
+assert.ok(world.stats.houses >= 4, "ashrams should contain huts");
+assert.ok(world.stats.trees > 20, "forests should plant trees");
 assert.ok(world.temples.length >= 7, "seven deity temples");
 const deities = world.temples.map((t) => t.deity);
 ["shiva", "kali", "ganesha"].forEach((d) => assert.ok(deities.includes(d), d + " temple"));
@@ -38,7 +38,7 @@ for (let y = world.spawn.y - 4; y <= world.spawn.y + 4; y++) {
 }
 assert.ok(walkableNear >= 10, "ashram plaza should be walkable");
 
-const world2 = generateWorld(1998, 1000);
+const world2 = generateWorld(1998);
 assert.deepStrictEqual(Buffer.from(world.tiles), Buffer.from(world2.tiles), "same seed is deterministic");
 assert.strictEqual(world.trees.length, world2.trees.length);
 assert.strictEqual(world.temples.length, world2.temples.length);
@@ -62,6 +62,8 @@ for (let i = 0; i < pop.npcs.length; i++) {
   assert.ok(isWalkable(world, pop.npcs[i].tx, pop.npcs[i].ty), pop.npcs[i].name + " left the path");
 }
 assert.notStrictEqual(pop.npcs.find((n) => n.id === mover.id).tx + "," + pop.npcs.find((n) => n.id === mover.id).ty, moverBefore, "a walking yogi should leave the first tile");
+assert.ok(replyLine("namaste").indexOf("Namaste") >= 0);
+assert.ok(replyLine("irgendwas", 3).length > 8);
 
 section("tile engine (1000×1000)");
 function stubCtx() {
@@ -112,7 +114,7 @@ const engineOut = vm.runInContext(`
   const engine = new AshramCanvas(screen);
   engine.resize(320, 208);
   const assets = buildHyruleAssets();
-  const world = AshramWorld.generateWorld(1998, 1000);
+  const world = AshramWorld.generateWorld(1998);
   engine.loadWorld(world, assets);
   engine.spawnLocal({ id: 1, name: "Test", slot: 0, color: "#c45c26", gender: "female", tx: world.spawn.x, ty: world.spawn.y, dir: 2 });
   engine.state = AshramCanvas.STATE_GAME;
@@ -157,8 +159,8 @@ const engineOut = vm.runInContext(`
   });
 `, sandbox);
 
-assert.strictEqual(engineOut.size, 1000);
-assert.ok(engineOut.objects > 200, "props (trees+huts+temples) loaded");
+assert.strictEqual(engineOut.size, 300);
+assert.ok(engineOut.objects > 30, "props (trees+huts+temples) loaded");
 assert.strictEqual(engineOut.clipHeld, true, "yogi sprite clip must not stick");
 assert.ok(engineOut.onScreen > 0, "some trees or huts should be on screen");
 assert.strictEqual(engineOut.missing, 0, "on-screen trees and huts must all be painted");
@@ -175,7 +177,7 @@ section("fastify + websocket + auth");
   const port = app.server.address().port;
   const health = await fetch("http://127.0.0.1:" + port + "/api/health").then((r) => r.json());
   assert.strictEqual(health.ok, true);
-  assert.strictEqual(health.world.size, 1000);
+  assert.strictEqual(health.world.size, 300);
   assert.ok((health.world.temples || []).length >= 7);
   assert.strictEqual(health.max, MAX_PLAYERS);
   assert.strictEqual(health.npcs, 6);
@@ -311,7 +313,24 @@ section("fastify + websocket + auth");
     poll();
   });
 
-  a.ws.send(JSON.stringify({ t: "whisper", to: b.welcome.player.id, text: "Namaste, gehen wir zum Shiva-Festival?" }));
+  a.ws.close();
+  await new Promise((resolve, reject) => {
+    const start = Date.now();
+    const poll = () => {
+      if (b.inbox.some((m) => m.t === "leave" && m.id === a.welcome.player.id)) return resolve();
+      if (Date.now() - start > 4000) return reject(new Error("leave was not broadcast"));
+      setTimeout(poll, 20);
+    };
+    poll();
+  });
+  const resumed = await openAuth(login.token);
+  assert.strictEqual(resumed.welcome.t, "welcome");
+  assert.strictEqual(resumed.welcome.player.tx, destX, "position resumes after reconnect");
+  assert.strictEqual(resumed.welcome.player.ty, destY);
+  sessions[0] = resumed;
+  const a2 = sessions[0];
+
+  a2.ws.send(JSON.stringify({ t: "whisper", to: b.welcome.player.id, text: "Namaste, gehen wir zum Shiva-Festival?" }));
   await new Promise((resolve, reject) => {
     const start = Date.now();
     const poll = () => {

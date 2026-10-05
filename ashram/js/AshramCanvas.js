@@ -378,7 +378,8 @@ class AshramCanvas {
       }
     }
 
-    this.minimap = makeMinimap(world);
+    this.minimap = null;
+    this.markers = [];
     this.lastHashCX = -9999;
     Sprite.engine = this;
   }
@@ -694,29 +695,24 @@ class AshramCanvas {
       ctx.fillStyle = "#f2d24a";
       ctx.fillText(p.label, p.x - (tw >> 1) + 3, p.y + p.offsetY - 1);
     }
-    ctx.restore();
-
-    if (this.minimap && this.player) {
-      const mm = this.minimap;
-      const fit = this.viewW < 280 ? 0.42 : this.viewW < 480 ? 0.55 : 0.75;
-      const dw = Math.round(mm.width * fit);
-      const dh = Math.round(mm.height * fit);
-      const mx = this.viewW - dw - 6;
-      const my = Math.max(4, this.uiTop || 8);
-      ctx.drawImage(mm, mx, my, dw, dh);
-      ctx.strokeStyle = "#f2d24a";
-      ctx.strokeRect(mx, my, dw, dh);
-      const px = mx + (this.player.tileX / this.width_map) * dw;
-      const py = my + (this.player.tileY / this.height_map) * dh;
+    for (let i = 0; i < (this.markers || []).length; i++) {
+      const m = this.markers[i];
+      const wx = this.tile_x(m.tx, m.ty) + 8;
+      const wy = this.tile_y(m.tx, m.ty) - 18;
+      if (wx < this.camX - 20 || wy < this.camY - 20 || wx > this.camX + this.viewW + 20 || wy > this.camY + this.viewH + 20) continue;
+      ctx.beginPath();
+      ctx.arc(wx, wy, 9, 0, Math.PI * 2);
+      ctx.fillStyle = m.kind === "video" ? "#c4302b" : "#d4a574";
+      ctx.fill();
       ctx.fillStyle = "#fff";
-      ctx.fillRect(px - 1, py - 1, 3, 3);
-      for (const r of [...this.remotes.values(), ...this.npcs.values()]) {
-        ctx.fillStyle = r.color || "#f44";
-        const rx = mx + (r.tileX / this.width_map) * dw;
-        const ry = my + (r.tileY / this.height_map) * dh;
-        ctx.fillRect(rx - 1, ry - 1, 3, 3);
-      }
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText(m.kind === "video" ? "▶" : "☀", wx - 4, wy + 4);
     }
+    ctx.restore();
+  }
+
+  setMarkers(list) {
+    this.markers = list || [];
   }
 
   paint() {

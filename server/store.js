@@ -272,6 +272,25 @@ function createStore(opts) {
     return row;
   }
 
+  function accountById(id) {
+    return accounts.find((a) => a.id === id) || null;
+  }
+
+  function savePosition(accountId, tx, ty, dir) {
+    const acc = accountById(accountId);
+    if (!acc) return;
+    acc.tx = tx | 0;
+    acc.ty = ty | 0;
+    acc.dir = dir & 3;
+    persistAccounts();
+  }
+
+  function savedPosition(accountId) {
+    const acc = accountById(accountId);
+    if (!acc || !Number.isFinite(acc.tx) || !Number.isFinite(acc.ty)) return null;
+    return { x: acc.tx, y: acc.ty, dir: acc.dir & 3 };
+  }
+
   function answerMeetup(id, toId, accept) {
     const row = meetups.find((m) => m.id === id && m.to === toId);
     if (!row) return { error: "Einladung nicht gefunden." };
@@ -296,7 +315,10 @@ function createStore(opts) {
     addWhisper,
     addMeetup,
     answerMeetup,
-    findAccount
+    findAccount,
+    accountById,
+    savePosition,
+    savedPosition
   };
 }
 

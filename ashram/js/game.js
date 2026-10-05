@@ -20,7 +20,9 @@ const Hyrule = {
   catalog: { deities: [], asanas: [], foci: [] },
   whisperTo: null,
   lastSent: { tx: -1, ty: -1, dir: -1, moving: false, at: 0 },
-  nearby: new Set()
+  nearby: new Set(),
+  markers: [],
+  stood: ""
 };
 
 function qs(id) { return document.getElementById(id); }
@@ -112,6 +114,74 @@ function updateHud() {
     }
   }
   Hyrule.nearby = next;
+  updateCompass();
+  touchMarker();
+}
+
+function esc(text) {
+  return String(text || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+}
+
+function shortName(name) {
+  const s = String(name || "");
+  return s.length > 28 ? s.slice(0, 27) + "…" : s;
+}
+
+function updateCompass() {
+  const e = Hyrule.engine;
+  if (!e || !e.player || !e.world) return;
+  const px = e.player.tileX;
+  const py = e.player.tileY;
+  const dests = [];
+  const temples = e.world.temples || e.world.villages || [];
+  for (let i = 0; i < temples.length; i++) dests.push({ name: temples[i].name, x: temples[i].x, y: temples[i].y });
+  for (let i = 0; i < Hyrule.markers.length; i++) {
+    const m = Hyrule.markers[i];
+    dests.push({ name: (m.kind === "video" ? "▶ " : "☀ ") + (m.title || ""), x: m.tx, y: m.ty });
+  }
+  const axes = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
+  const keys = ["n", "e", "s", "w"];
+  for (let k = 0; k < keys.length; k++) {
+    const axis = axes[keys[k]];
+    let best = "";
+    let score = 0.42;
+    for (let i = 0; i < dests.length; i++) {
+      const dx = dests[i].x - px;
+      const dy = dests[i].y - py;
+      const len = Math.hypot(dx, dy);
+      if (len < 3) continue;
+      const dot = (dx / len) * axis[0] + (dy / len) * axis[1];
+      if (dot > score) { score = dot; best = dests[i].name; }
+    }
+    qs("edge-" + keys[k]).textContent = shortName(best);
+  }
+}
+
+function setMarkers(list) {
+  Hyrule.markers = list || [];
+  if (Hyrule.engine) Hyrule.engine.setMarkers(Hyrule.markers);
+}
+
+function openVideo(marker) {
+  const id = String(marker.videoId || "").replace(/[^A-Za-z0-9_-]/g, "");
+  const box = qs("panel-video");
+  box.innerHTML = "<p>" + esc(marker.title) + "</p>" +
+    (id ? "<div class='video-frame'><iframe src='https://www.youtube-nocookie.com/embed/" + id + "' title='" + esc(marker.title) + "' allow='accelerometer; autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe></div>" : "") +
+    "<button type='button' id='video-cal'>Termine &amp; weitere Videos</button>";
+  showPanel("video", "Yoga-Video");
+  qs("video-cal").onclick = () => { renderCalendar(); showPanel("calendar", "Termine & Videos"); };
+}
+
+function touchMarker() {
+  const p = Hyrule.engine && Hyrule.engine.player;
+  if (!p || !Hyrule.joined) return;
+  const key = p.tileX + "," + p.tileY;
+  if (key === Hyrule.stood) return;
+  Hyrule.stood = key;
+  const hit = Hyrule.markers.find((m) => m.tx === p.tileX && m.ty === p.tileY);
+  if (!hit) return;
+  if (hit.kind === "video") openVideo(hit);
+  else { renderCalendar(); showPanel("calendar", "Termine & Videos"); }
 }
 
 function apiBase() {
@@ -156,7 +226,7 @@ function maybeSendMove(force) {
 function showPanel(name, title) {
   qs("overlay").classList.remove("hidden");
   qs("sheet-title").textContent = title || name;
-  ["calendar", "festival", "meet", "profile", "whisper"].forEach((id) => {
+  ["calendar", "festival", "meet", "profile", "whisper", "video"].forEach((id) => {
     qs("panel-" + id).classList.toggle("hidden", id !== name);
   });
 }
@@ -166,7 +236,39 @@ function hideOverlay() { qs("overlay").classList.add("hidden"); }
 function renderCalendar() {
   const box = qs("panel-calendar");
   const rows = Hyrule.calendar.slice().sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)));
-  box.innerHTML = rows.length ? "" : "<p>Noch keine Festivals.</p>";
+  const videos = Hyrule.markers.filter((m) => m.kind === "video");
+  const events = Hyrule.markers.filter((m) => m.kind === "event");
+  box.innerHTML = "";
+  if (videos.length) {
+    const head = document.createElement("p");
+    head.className = "meta";
+    head.textContent = "Yoga-Videos";
+    box.appendChild(head);
+    videos.forEach((m) => {
+      const el = document.createElement("article");
+      el.className = "fest-card";
+      el.innerHTML = "<h3>▶ " + esc(m.title) + "</h3><p class='meta'>Kachel " + m.tx + "," + m.ty + "</p>";
+      const go = document.createElement("button");
+      go.textContent = "Ansehen";
+      go.addEventListener("click", () => openVideo(m));
+      el.appendChild(go);
+      box.appendChild(el);
+    });
+  }
+  if (events.length) {
+    const head = document.createElement("p");
+    head.className = "meta";
+    head.textContent = "Stunden auf dem Gelände";
+    box.appendChild(head);
+    events.forEach((m) => {
+      const el = document.createElement("article");
+      el.className = "fest-card";
+      const when = m.when ? String(m.when).slice(0, 16).replace("T", " ") : "";
+      el.innerHTML = "<h3>☀ " + esc(m.title) + "</h3><p>" + esc(when) + (m.where ? " · " + esc(m.where) : "") + "</p>";
+      box.appendChild(el);
+    });
+  }
+  if (!rows.length && !videos.length && !events.length) box.innerHTML = "<p>Noch keine Termine.</p>";
   rows.forEach((f) => {
     const el = document.createElement("article");
     el.className = "fest-card";
@@ -271,6 +373,7 @@ function enterWorld() {
   qs("pad").classList.remove("hidden");
   fitView();
   qs("chat").classList.remove("hidden");
+  qs("compass").classList.remove("hidden");
 }
 
 function onMessage(msg) {
@@ -285,6 +388,7 @@ function onMessage(msg) {
       for (let i = 0; i < msg.players.length; i++) e.upsertRemote(msg.players[i]);
       const residents = msg.npcs || [];
       for (let i = 0; i < residents.length; i++) e.upsertNpc(residents[i]);
+      setMarkers(msg.markers || []);
       e.state = AshramCanvas.STATE_GAME;
       Hyrule.joined = true;
       enterWorld();
@@ -309,6 +413,10 @@ function onMessage(msg) {
       break;
     case "npcs":
       for (let i = 0; i < (msg.npcs || []).length; i++) e.upsertNpc(msg.npcs[i]);
+      break;
+    case "markers":
+      setMarkers(msg.markers || []);
+      if (!qs("panel-calendar").classList.contains("hidden")) renderCalendar();
       break;
     case "say":
       appendChat(msg.name + ": " + msg.text);
@@ -452,23 +560,35 @@ function wireInput() {
     e.keyReleased(ev.key);
   });
 
-  function bindPad(id, dir) {
-    const el = qs(id);
-    const start = (ev) => {
-      ev.preventDefault();
-      if (ev.pointerId != null && el.setPointerCapture) el.setPointerCapture(ev.pointerId);
-      e.holdDir(dir, true);
-    };
-    const end = (ev) => { ev.preventDefault(); e.holdDir(dir, false); };
-    el.addEventListener("pointerdown", start);
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", end);
-    el.addEventListener("lostpointercapture", end);
-  }
-  bindPad("pad-up", "up");
-  bindPad("pad-down", "down");
-  bindPad("pad-left", "left");
-  bindPad("pad-right", "right");
+  const stick = qs("stick");
+  const knob = qs("stick-knob");
+  let stickOn = false;
+  const aimStick = (ev) => {
+    const r = stick.getBoundingClientRect();
+    const dx = ev.clientX - (r.left + r.width / 2);
+    const dy = ev.clientY - (r.top + r.height / 2);
+    const dist = Math.hypot(dx, dy) || 1;
+    const reach = Math.min(r.width * 0.32, dist);
+    knob.style.transform = "translate(" + ((dx / dist) * reach) + "px," + ((dy / dist) * reach) + "px)";
+    if (dist < 12) { e.holdDir("up", false); return; }
+    const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    e.holdDir(dir, true);
+  };
+  const dropStick = () => {
+    stickOn = false;
+    knob.style.transform = "translate(0px,0px)";
+    e.holdDir("up", false);
+  };
+  stick.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    stickOn = true;
+    if (stick.setPointerCapture) stick.setPointerCapture(ev.pointerId);
+    aimStick(ev);
+  });
+  stick.addEventListener("pointermove", (ev) => { if (stickOn) aimStick(ev); });
+  stick.addEventListener("pointerup", dropStick);
+  stick.addEventListener("pointercancel", dropStick);
+  stick.addEventListener("lostpointercapture", dropStick);
 
   qs("pad-act").addEventListener("pointerdown", (ev) => {
     ev.preventDefault();
@@ -511,7 +631,7 @@ function wireInput() {
   document.querySelectorAll("#menu-bar button").forEach((btn) => {
     btn.addEventListener("click", () => {
       const panel = btn.getAttribute("data-panel");
-      if (panel === "calendar") { renderCalendar(); showPanel("calendar", "Veranstaltungskalender"); }
+      if (panel === "calendar") { renderCalendar(); showPanel("calendar", "Termine & Videos"); }
       if (panel === "meet") { renderMeet(); showPanel("meet", "Treffen verabreden"); }
       if (panel === "profile") { renderProfile(); showPanel("profile", "Profil"); }
     });

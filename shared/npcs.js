@@ -21,12 +21,12 @@
 
   /* name, behavior, focus, gender, home deity (or "spawn"), tempo, lines */
   const CAST = [
-    ["Anjali", "wander", "hatha", "female", "spawn", 2, ["Namaste. Der Platz am Feuer ist frei."]],
-    ["Arun", "pace", "vinyasa", "male", "ganesha", 2, ["Surya Namaskar, ein Schritt nach dem anderen."]],
-    ["Devi", "circuit", "bhakti", "female", "shiva", 2, ["Einmal um den Tempel, dann weiter."]],
-    ["Hari", "wander", "hatha", "male", "hanuman", 2, ["Der Pfad trägt."]],
-    ["Meera", "pace", "meditation", "female", "lakshmi", 2, ["Ein. Aus. Und weitergehen."]],
-    ["Nanda", "wander", "ashtanga", "male", "kali", 2, ["Dranbleiben."]]
+    ["Anjali", "wander", "hatha", "female", "spawn", 2, ["Namaste. Der Platz am Feuer ist frei, der Kopf darf sich dazusetzen."]],
+    ["Arun", "pace", "vinyasa", "male", "ganesha", 2, ["Surya Namaskar: die Sonne wartet nicht, aber sie hetzt auch nicht."]],
+    ["Devi", "circuit", "bhakti", "female", "shiva", 2, ["Einmal um den Tempel. Wer Abkürzung sucht, läuft meist zweimal."]],
+    ["Hari", "wander", "hatha", "male", "hanuman", 2, ["Der Pfad trägt. Die Eile trägst du selbst, und sie ist schwer."]],
+    ["Meera", "pace", "meditation", "female", "lakshmi", 2, ["Ein. Aus. Der Reichtum sitzt zwischen den beiden."]],
+    ["Nanda", "wander", "ashtanga", "male", "kali", 2, ["Dranbleiben. Kali mag keine halben Ausreden, aber ehrliche Pausen."]]
   ];
 
   function rngOf(seed) {
@@ -222,5 +222,34 @@
     };
   }
 
-  return { CAST, createPopulation, stepAll, stepOne, publicNpc };
+  const REPLIES = [
+    ["namaste", "Namaste. Der Gruß ist schon die halbe Übung."],
+    ["hallo", "Hallo. Setz die Sohle hin, der Kopf darf später kommen."],
+    ["müde", "Müde ist ein ehrlicher Lehrer. Dann heute nur atmen."],
+    ["mude", "Müde ist ein ehrlicher Lehrer. Dann heute nur atmen."],
+    ["hilfe", "Hilfe ist erlaubt. Die Wand steht, du musst sie nicht sein."],
+    ["wo", "Wohin du schaust, da ist schon ein Tempel. Oder ein Umweg, der einer ist."],
+    ["danke", "Danke zurück. Der Boden hat mitgehört."]
+  ];
+
+  function replyLine(text, salt) {
+    const t = String(text || "").toLowerCase();
+    for (let i = 0; i < REPLIES.length; i++) {
+      if (t.indexOf(REPLIES[i][0]) >= 0) return REPLIES[i][1];
+    }
+    const bank = [
+      "Ein Atemzug, dann der nächste Schritt. Mehr Programm hat der Tag nicht.",
+      "Wer die Knie weich lässt, kommt weiter als wer recht hat.",
+      "Das Ziel ist nett. Der Weg ist die eigentliche Frechheit.",
+      "Wenn du fällst, war die Erde die ganze Zeit schon da.",
+      "Nicht schneller üben. Deutlicher.",
+      "Der Geist will die Abkürzung. Die Ferse kennt nur die Kachel.",
+      "Lächeln ist auch eine Haltung. Und sie zählt.",
+      "Du musst nicht ankommen. Du musst nur nicht umdrehen, solange es sich wahr anfühlt."
+    ];
+    const n = (salt || 0) + t.length * 13;
+    return bank[(n >>> 0) % bank.length];
+  }
+
+  return { CAST, createPopulation, stepAll, stepOne, publicNpc, replyLine };
 });

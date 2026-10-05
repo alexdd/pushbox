@@ -18,10 +18,10 @@
       <span class="hud-tile">Kachel <em id="hud-pos">500,500</em></span>
     </div>
     <nav id="menu-bar">
-      <button type="button" data-panel="calendar">Kalender</button>
-      <button type="button" data-panel="meet">Treffen</button>
-      <button type="button" data-panel="profile">Profil</button>
-      <button type="button" id="chat-toggle" aria-pressed="false">Chat</button>
+      <button type="button" data-panel="calendar"><span class="glyph">☸</span> Kalender</button>
+      <button type="button" data-panel="meet"><span class="glyph">ॐ</span> Treffen</button>
+      <button type="button" data-panel="profile"><span class="glyph">☀</span> Profil</button>
+      <button type="button" id="chat-toggle" aria-pressed="false"><span class="glyph">✿</span> Chat</button>
     </nav>
     <div class="hud-right">
       <span id="status">…</span>
@@ -48,12 +48,16 @@
     </div>
   </section>
 
+  <div id="compass" class="hidden" aria-hidden="true">
+    <div id="edge-n" class="edge edge-n"></div>
+    <div id="edge-e" class="edge edge-e"></div>
+    <div id="edge-s" class="edge edge-s"></div>
+    <div id="edge-w" class="edge edge-w"></div>
+  </div>
+
   <div id="pad" class="hidden">
-    <div class="dpad">
-      <button id="pad-up" aria-label="Norden">▲</button>
-      <button id="pad-left" aria-label="Westen">◀</button>
-      <button id="pad-right" aria-label="Osten">▶</button>
-      <button id="pad-down" aria-label="Süden">▼</button>
+    <div id="stick" aria-label="Bewegung">
+      <div id="stick-knob"></div>
     </div>
     <button id="pad-act" aria-label="Namaste">🙏</button>
   </div>
@@ -73,6 +77,7 @@
         <button type="button" id="sheet-close">✕</button>
       </header>
       <div id="panel-calendar" class="panel"></div>
+      <div id="panel-video" class="panel hidden"></div>
       <div id="panel-festival" class="panel hidden"></div>
       <div id="panel-meet" class="panel hidden"></div>
       <div id="panel-profile" class="panel hidden"></div>
