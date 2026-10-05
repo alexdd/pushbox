@@ -6,9 +6,10 @@ collection.
 
 **Blog post:** [PushBox: J2ME to HTML5 in 49 Minutes](https://www.tekturcms.de/index.html#2026-06-13-pushbox-j2me-to-html5-in-49-minutes)
 
-This branch is a plain **HTML5 / JavaScript** port of PushBox, plus a **Hyrule**
-prototype: the same isometric tile engine scaled to a **1000×1000** overworld,
-with a Fastify + WebSocket backend so up to **5 players** can walk it together.
+This branch is a plain **HTML5 / JavaScript** port of PushBox, plus a **Yoga Event
+Area**: the same isometric tile engine scaled to a **1000×1000** ashram overworld
+(temples, symbolic Devatas, festivals). Fastify + WebSockets: yoga-website
+login, calendar, private yogi chat, up to **5** wanderers online.
 
 ## Run locally
 
@@ -19,12 +20,12 @@ python3 -m http.server 8000
 # open http://localhost:8000/index.html
 ```
 
-Hyrule MMORPG prototype (serves PushBox and `/zelda/`):
+Yoga Event Area (serves PushBox and `/ashram/`):
 
 ```bash
 npm install
 npm start
-# open http://localhost:3000/zelda/
+# open http://localhost:3000/ashram/
 ```
 
 Embed mode (for iframes): `index.html?embed=1`
@@ -33,7 +34,7 @@ Embed mode (for iframes): `index.html?embed=1`
 
 ```bash
 node tools/headless_test.js
-node tools/zelda_test.js
+node tools/ashram_test.js
 node --check js/*.js
 ```
 
@@ -49,7 +50,7 @@ node --check js/*.js
 | `js/levels.js` | Embedded level data (33 stages) |
 | `tools/headless_test.js` | Headless smoke test + solver check |
 | `tools/solver.js` | BFS solver driving the real engine |
-| `zelda/` | Hyrule prototype (login, touch pad, isometric client) |
+| `ashram/` | Yoga ashram client (login, touch pad, isometric view) |
 | `shared/world.js` | Deterministic 1000×1000 overworld (rivers, bridges, villages) |
 | `server/index.js` | Fastify + WebSocket MMORPG backend (max 5 players) |
 
@@ -64,11 +65,12 @@ PushBox:
 - Space / Enter = fire (advance menus / select a stage).
 - Flow: **title → fire → pick a stage → fire → push every crate onto a target tile.**
 
-Hyrule (`/zelda/`):
+Yoga Event Area (locally `/ashram/`, on the site `/yoga-spiel/`):
 
-- Enter a name and join (max 5 concurrent players).
-- Walk the isometric overworld (trees, rivers with bridges, five villages).
-- See other players live, chat, and wave (`E` or the action button).
-- Touch D-pad on phones and tablets; the canvas scales to the viewport.
+- Log in with a yoga-website account.
+- Walk between temples (Shiva, Kali, Ganesha, Lakshmi, Saraswati, Hanuman, Krishna).
+- Open the calendar, sign up for a festival, book sessions, invite another yogi.
+- Click a wandering yogi to open a private real-time chat.
+- Touch D-pad on phones and tablets.
 
 Alex's homepage: [www.tekturcms.de](https://www.tekturcms.de/)

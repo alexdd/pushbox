@@ -1,0 +1,354 @@
+/*
+ * Headless checks for the Yoga Event Area:
+ *   1. 1000×1000 world has rivers, temples, deities, walkable spawn
+ *   2. AshramCanvas loads and the yogi can take a step
+ *   3. Fastify: 5 online, 6th rejected; register/login; whisper; festival join
+ */
+"use strict";
+
+const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const vm = require("vm");
+const { generateWorld, isWalkable, TILE } = require("../shared/world");
+const { createPopulation, stepAll, replyLine } = require("../shared/npcs");
+const { buildServer, MAX_PLAYERS } = require("../server/index");
+
+function section(name) { console.log("  · " + name); }
+
+section("world generator");
+const world = generateWorld(1998);
+assert.strictEqual(world.size, 300);
+assert.strictEqual(world.tiles.length, 300 * 300);
+assert.ok(world.stats.water > 40, "rivers should cover water tiles");
+assert.ok(world.stats.bridges > 4, "roads must cross rivers on bridges");
+assert.ok(world.stats.houses >= 4, "ashrams should contain huts");
+assert.ok(world.stats.trees > 20, "forests should plant trees");
+assert.ok(world.temples.length >= 7, "seven deity temples");
+const deities = world.temples.map((t) => t.deity);
+["shiva", "kali", "ganesha"].forEach((d) => assert.ok(deities.includes(d), d + " temple"));
+assert.ok(isWalkable(world, world.spawn.x, world.spawn.y), "spawn must be walkable");
+
+let walkableNear = 0;
+for (let y = world.spawn.y - 4; y <= world.spawn.y + 4; y++) {
+  for (let x = world.spawn.x - 4; x <= world.spawn.x + 4; x++) {
+    if (isWalkable(world, x, y)) walkableNear++;
+  }
+}
+assert.ok(walkableNear >= 10, "ashram plaza should be walkable");
+
+const world2 = generateWorld(1998);
+assert.deepStrictEqual(Buffer.from(world.tiles), Buffer.from(world2.tiles), "same seed is deterministic");
+assert.strictEqual(world.trees.length, world2.trees.length);
+assert.strictEqual(world.temples.length, world2.temples.length);
+
+section("ashram residents");
+const pop = createPopulation(world);
+assert.strictEqual(pop.npcs.length, 6);
+const names = new Set(pop.npcs.map((n) => n.name));
+assert.strictEqual(names.size, 6);
+const behaviors = new Set(pop.npcs.map((n) => n.behavior));
+assert.ok(behaviors.has("pace") && behaviors.has("wander") && behaviors.has("circuit"));
+assert.ok(!behaviors.has("still") && !behaviors.has("greet"));
+for (let i = 0; i < pop.npcs.length; i++) {
+  const n = pop.npcs[i];
+  assert.ok(isWalkable(world, n.tx, n.ty), n.name + " must stand on walkable ground");
+}
+const mover = pop.npcs.find((n) => n.behavior === "pace" || n.behavior === "wander");
+const moverBefore = mover.tx + "," + mover.ty;
+for (let i = 0; i < 40; i++) stepAll(pop, world, [{ tx: world.spawn.x, ty: world.spawn.y }], 100000 + i * 1000);
+for (let i = 0; i < pop.npcs.length; i++) {
+  assert.ok(isWalkable(world, pop.npcs[i].tx, pop.npcs[i].ty), pop.npcs[i].name + " left the path");
+}
+assert.notStrictEqual(pop.npcs.find((n) => n.id === mover.id).tx + "," + pop.npcs.find((n) => n.id === mover.id).ty, moverBefore, "a walking yogi should leave the first tile");
+assert.ok(replyLine("namaste").indexOf("Namaste") >= 0);
+assert.ok(replyLine("irgendwas", 3).length > 8);
+
+section("tile engine (1000×1000)");
+function stubCtx() {
+  return new Proxy({}, {
+    get(t, p) {
+      if (p === "measureText") return () => ({ width: 8 });
+      if (p === "createImageData") return (w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h });
+      if (p === "getImageData") return (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h });
+      return () => {};
+    },
+    set(t, p, v) { t[p] = v; return true; }
+  });
+}
+const documentStub = {
+  createElement() {
+    const c = { width: 0, height: 0 };
+    c.getContext = () => stubCtx();
+    c.getWidth = function () { return this.width; };
+    c.getHeight = function () { return this.height; };
+    return c;
+  },
+  getElementById() {
+    const c = documentStub.createElement();
+    c.width = 320; c.height = 208;
+    return c;
+  }
+};
+const sandbox = {
+  window: { addEventListener() {} },
+  document: documentStub,
+  requestAnimationFrame() {},
+  console,
+  AshramWorld: require("../shared/world"),
+  YogaCatalog: require("../shared/catalog")
+};
+vm.createContext(sandbox);
+const load = (rel) => {
+  const abs = path.join(__dirname, "..", rel);
+  vm.runInContext(fs.readFileSync(abs, "utf8"), sandbox, { filename: rel });
+};
+load("js/runtime.js");
+load("js/Sprite.js");
+load("ashram/js/assets.js");
+load("ashram/js/AshramCanvas.js");
+
+const engineOut = vm.runInContext(`
+  const screen = document.getElementById("screen");
+  const engine = new AshramCanvas(screen);
+  engine.resize(320, 208);
+  const assets = buildHyruleAssets();
+  const world = AshramWorld.generateWorld(1998);
+  engine.loadWorld(world, assets);
+  engine.spawnLocal({ id: 1, name: "Test", slot: 0, color: "#c45c26", gender: "female", tx: world.spawn.x, ty: world.spawn.y, dir: 2 });
+  engine.state = AshramCanvas.STATE_GAME;
+  const before = { x: engine.player.tileX, y: engine.player.tileY };
+  engine.RIGHT = true;
+  for (let i = 0; i < 20; i++) engine.step();
+  engine.resize(480, 320);
+  engine.setCamera(engine.player.x, engine.player.y);
+  engine.g.setClip(0, 0, engine.viewW, engine.viewH);
+  engine.player.paint(engine.g);
+  const clipHeld = engine.g.clipW >= engine.viewW && engine.g.clipH >= engine.viewH;
+  const painted = new Set();
+  const origPaint = Prop.prototype.paint;
+  Prop.prototype.paint = function (g) {
+    painted.add(this);
+    return origPaint.call(this, g);
+  };
+  engine.paint();
+  Prop.prototype.paint = origPaint;
+  let missing = 0;
+  let onScreen = 0;
+  for (let i = 0; i < engine.props.length; i++) {
+    const p = engine.props[i];
+    if (!AshramCanvas.isOnScreen(engine, p)) continue;
+    onScreen++;
+    if (!painted.has(p)) missing++;
+  }
+  engine.paint();
+  const ground = engine.visibleTiles();
+  const under = ground.some((t) => t.tx === engine.player.tileX && t.ty === engine.player.tileY);
+  ({
+    size: engine.width_map,
+    objects: engine.props.length,
+    temples: engine.props.filter((p) => p.kind === "temple").length,
+    moved: engine.player.tileX !== before.x || engine.player.tileY !== before.y || engine.player.state === Sprite.STATE_MOVING,
+    spawn: before,
+    tile: engine.getTile(before.x, before.y),
+    clipHeld,
+    missing,
+    onScreen,
+    under
+  });
+`, sandbox);
+
+assert.strictEqual(engineOut.size, 300);
+assert.ok(engineOut.objects > 30, "props (trees+huts+temples) loaded");
+assert.strictEqual(engineOut.clipHeld, true, "yogi sprite clip must not stick");
+assert.ok(engineOut.onScreen > 0, "some trees or huts should be on screen");
+assert.strictEqual(engineOut.missing, 0, "on-screen trees and huts must all be painted");
+assert.strictEqual(engineOut.under, true, "the tile under the yogi must be in the camera window");
+assert.ok(engineOut.temples >= 5, "temple props placed");
+assert.ok(engineOut.moved, "yogi should walk on the plaza");
+assert.ok(engineOut.tile === TILE.PATH || engineOut.tile === TILE.GRASS || engineOut.tile === TILE.FLOWER);
+
+section("fastify + websocket + auth");
+(async () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "yoga-"));
+  const app = await buildServer({ logger: false, seed: 1998, dataDir });
+  await app.listen({ port: 0, host: "127.0.0.1" });
+  const port = app.server.address().port;
+  const health = await fetch("http://127.0.0.1:" + port + "/api/health").then((r) => r.json());
+  assert.strictEqual(health.ok, true);
+  assert.strictEqual(health.world.size, 300);
+  assert.ok((health.world.temples || []).length >= 7);
+  assert.strictEqual(health.max, MAX_PLAYERS);
+  assert.strictEqual(health.npcs, 6);
+
+  const closedRegister = await fetch("http://127.0.0.1:" + port + "/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+  assert.strictEqual(closedRegister.status, 404, "standalone game register is gone");
+  const closedLogin = await fetch("http://127.0.0.1:" + port + "/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}"
+  });
+  assert.strictEqual(closedLogin.status, 404, "standalone game login is gone");
+
+  const suffix = String(Date.now() % 100000);
+  const store = app.hyrule.store;
+  const reg = store.register({
+    name: "Mira" + suffix,
+    password: "om1234",
+    gender: "female",
+    focus: "bhakti",
+    asanas: ["padma", "surya"]
+  });
+  assert.ok(!reg.error, reg.error);
+  assert.strictEqual(reg.account.gender, "female");
+  const login = { token: store.createSession(reg.account), account: reg.account };
+  assert.ok(login.token);
+
+  const cal = await fetch("http://127.0.0.1:" + port + "/api/calendar", {
+    headers: { Authorization: "Bearer " + login.token }
+  }).then((r) => r.json());
+  assert.ok(cal.festivals.length >= 5, "calendar has temple festivals");
+
+  const joinedFest = await fetch("http://127.0.0.1:" + port + "/api/festivals/" + cal.festivals[0].id + "/join", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + login.token, "Content-Type": "application/json" },
+    body: JSON.stringify({ asanas: ["padma"], focus: "meditation", booked: ["dawn"] })
+  }).then((r) => r.json());
+  assert.ok(joinedFest.festival.mine);
+  assert.ok(joinedFest.festival.mine.booked.indexOf("dawn") >= 0);
+
+  function openGuest(name) {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket("ws://127.0.0.1:" + port + "/ws");
+      const inbox = [];
+      ws.addEventListener("message", (ev) => inbox.push(JSON.parse(ev.data)));
+      ws.addEventListener("open", () => {
+        ws.send(JSON.stringify({ t: "join", name }));
+      });
+      ws.addEventListener("error", reject);
+      const start = Date.now();
+      const wait = () => {
+        const welcome = inbox.find((m) => m.t === "welcome" || m.t === "error");
+        if (welcome) return resolve({ ws, inbox, welcome });
+        if (Date.now() - start > 4000) return reject(new Error("join timeout for " + name));
+        setTimeout(wait, 20);
+      };
+      wait();
+    });
+  }
+
+  function sessionFor(name) {
+    const created = store.register({
+      name,
+      password: "om1234",
+      gender: "male",
+      focus: "hatha",
+      asanas: ["tadasana"]
+    });
+    assert.ok(!created.error, created.error);
+    return store.createSession(created.account);
+  }
+
+  function openAuth(token) {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket("ws://127.0.0.1:" + port + "/ws");
+      const inbox = [];
+      ws.addEventListener("message", (ev) => inbox.push(JSON.parse(ev.data)));
+      ws.addEventListener("open", () => ws.send(JSON.stringify({ t: "auth", token })));
+      ws.addEventListener("error", reject);
+      const start = Date.now();
+      const wait = () => {
+        const welcome = inbox.find((m) => m.t === "welcome" || m.t === "error");
+        if (welcome) return resolve({ ws, inbox, welcome });
+        if (Date.now() - start > 4000) return reject(new Error("auth timeout"));
+        setTimeout(wait, 20);
+      };
+      wait();
+    });
+  }
+
+  const guest = await openGuest("Elmo");
+  assert.strictEqual(guest.welcome.t, "error");
+  assert.strictEqual(guest.welcome.code, "auth");
+  guest.ws.close();
+
+  const sessions = [];
+  const authed = await openAuth(login.token);
+  assert.strictEqual(authed.welcome.t, "welcome");
+  assert.strictEqual(authed.welcome.player.gender, "female");
+  assert.ok(authed.welcome.calendar.length >= 5);
+  sessions.push(authed);
+
+  for (let i = 0; i < 4; i++) {
+    const s = await openAuth(sessionFor("Yogi" + suffix + (i + 1)));
+    assert.strictEqual(s.welcome.t, "welcome", "player " + (i + 1) + " should join");
+    sessions.push(s);
+  }
+
+  const sixth = await openAuth(sessionFor("ZuViel" + suffix));
+  assert.strictEqual(sixth.welcome.t, "error");
+  assert.strictEqual(sixth.welcome.code, "full");
+  sixth.ws.close();
+
+  const a = sessions[0], b = sessions[1];
+  const destX = a.welcome.player.tx + 1;
+  const destY = a.welcome.player.ty;
+  a.ws.send(JSON.stringify({
+    t: "move", tx: destX, ty: destY, x: 10, y: 20, dir: 1, moving: true
+  }));
+
+  await new Promise((resolve, reject) => {
+    const start = Date.now();
+    const poll = () => {
+      if (b.inbox.some((m) => m.t === "move" && m.player.id === a.welcome.player.id && m.player.tx === destX))
+        return resolve(true);
+      if (Date.now() - start > 4000) return reject(new Error("move was not broadcast"));
+      setTimeout(poll, 20);
+    };
+    poll();
+  });
+
+  a.ws.close();
+  await new Promise((resolve, reject) => {
+    const start = Date.now();
+    const poll = () => {
+      if (b.inbox.some((m) => m.t === "leave" && m.id === a.welcome.player.id)) return resolve();
+      if (Date.now() - start > 4000) return reject(new Error("leave was not broadcast"));
+      setTimeout(poll, 20);
+    };
+    poll();
+  });
+  const resumed = await openAuth(login.token);
+  assert.strictEqual(resumed.welcome.t, "welcome");
+  assert.strictEqual(resumed.welcome.player.tx, destX, "position resumes after reconnect");
+  assert.strictEqual(resumed.welcome.player.ty, destY);
+  sessions[0] = resumed;
+  const a2 = sessions[0];
+
+  a2.ws.send(JSON.stringify({ t: "whisper", to: b.welcome.player.id, text: "Namaste, gehen wir zum Shiva-Festival?" }));
+  await new Promise((resolve, reject) => {
+    const start = Date.now();
+    const poll = () => {
+      if (b.inbox.some((m) => m.t === "whisper" && m.text.indexOf("Shiva") >= 0)) return resolve();
+      if (Date.now() - start > 4000) return reject(new Error("whisper was not delivered"));
+      setTimeout(poll, 20);
+    };
+    poll();
+  });
+
+  for (const s of sessions) s.ws.close();
+  await app.close();
+
+  console.log("ashram_test: ok");
+  console.log("  world", world.stats);
+  console.log("  temples", world.temples.map((t) => t.deity + "@" + t.x + "," + t.y).join(" "));
+  console.log("  engine moved from", engineOut.spawn);
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

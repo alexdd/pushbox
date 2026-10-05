@@ -2,8 +2,8 @@
  * Copyright (c) 2026 Alex Düsel. www.tekturcms.de
  * All rights reserved.
  *
- * Deterministic 1000×1000 overworld shared by the Fastify server and the
- * HTML5 client. Same seed → identical rivers, bridges, roads, villages,
+ * Deterministic overworld shared by the Fastify server and the
+ * HTML5 client. Same seed → identical rivers, bridges, roads, temples,
  * houses and trees, so the server can validate walks without sending a
  * megabyte tile blob.
  */
@@ -12,10 +12,14 @@
 (function (root, factory) {
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
-  root.ZeldaWorld = api;
+  root.AshramWorld = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
 
-  const SIZE = 1000;
+  const Catalog = (typeof YogaCatalog !== "undefined")
+    ? YogaCatalog
+    : (typeof require === "function" ? require("./catalog") : null);
+
+  const SIZE = 300;
   const DEFAULT_SEED = 1998;
 
   const TILE = {
@@ -38,12 +42,29 @@
     [TILE.FLOOR]: true
   };
 
-  const VILLAGES = [
-    { name: "Hateno", x: 500, y: 500 },
-    { name: "Kakariko", x: 220, y: 210 },
-    { name: "Rito", x: 790, y: 240 },
-    { name: "Goron", x: 200, y: 780 },
-    { name: "Zora", x: 820, y: 800 }
+  const VILLAGE_LAYOUT = [
+    { name: "Kailash Ashram", fx: 0.50, fy: 0.50, deity: "shiva" },
+    { name: "Kalighat Mandir", fx: 0.22, fy: 0.21, deity: "kali" },
+    { name: "Ganapati Mandir", fx: 0.79, fy: 0.24, deity: "ganesha" },
+    { name: "Padma Ashram", fx: 0.20, fy: 0.78, deity: "lakshmi" },
+    { name: "Vani Mandir", fx: 0.82, fy: 0.80, deity: "saraswati" }
+  ];
+
+  function u(size, n) {
+    return Math.max(2, Math.round(n * size / 1000));
+  }
+
+  function villagesFor(size) {
+    return VILLAGE_LAYOUT.map((v) => ({
+      name: v.name,
+      deity: v.deity,
+      x: Math.round(v.fx * (size - 1)),
+      y: Math.round(v.fy * (size - 1))
+    }));
+  }
+  const EXTRA_DEITIES = [
+    { deity: "hanuman", name: "Anjaneya Mandir" },
+    { deity: "krishna", name: "Vrindavan Kunj" }
   ];
 
   const SPAWN_OFFSETS = [
@@ -177,6 +198,11 @@
     }
     stampDisk(world, cx, cy, 3, TILE.PATH);
 
+    const templeFoot = { x: cx - 1, y: cy - 3, w: 3, h: 3 };
+    if (canPlaceHouse(world, templeFoot.x, templeFoot.y, templeFoot.w, templeFoot.h)) {
+      occupyHouse(world, templeFoot);
+    }
+
     const houses = [];
     const spots = [
       [cx - 7, cy - 6], [cx + 5, cy - 6],
@@ -221,7 +247,7 @@
     for (let c = 0; c < clusters; c++) {
       const cx = 30 + ((rng() * (world.size - 60)) | 0);
       const cy = 30 + ((rng() * (world.size - 60)) | 0);
-      if (nearVillage(cx, cy, 36)) continue;
+      if (nearVillage(cx, cy, 36, world)) continue;
       const n = 18 + ((rng() * 28) | 0);
       for (let i = 0; i < n; i++) {
         const tx = cx + ((rng() * 22 - 11) | 0);
@@ -236,7 +262,7 @@
       const tx = 8 + ((rng() * (world.size - 16)) | 0);
       const ty = 8 + ((rng() * (world.size - 16)) | 0);
       if (!canPlant(world, tx, ty)) continue;
-      if (nearVillage(tx, ty, 16)) continue;
+      if (nearVillage(tx, ty, 16, world)) continue;
       markBlocked(world, tx, ty);
       trees.push({ x: tx, y: ty, variant: rng() < 0.4 ? 1 : 0 });
     }
@@ -251,12 +277,33 @@
     return true;
   }
 
-  function nearVillage(x, y, radius) {
-    for (let i = 0; i < VILLAGES.length; i++) {
-      const v = VILLAGES[i];
+  function templeList(world) {
+    return (world && world.temples && world.temples.length) ? world.temples : villagesFor(SIZE);
+  }
+
+  function nearVillage(x, y, radius, world) {
+    const list = templeList(world);
+    for (let i = 0; i < list.length; i++) {
+      const v = list[i];
       if (Math.abs(v.x - x) <= radius && Math.abs(v.y - y) <= radius) return true;
     }
     return false;
+  }
+
+  function makeTemple(site) {
+    const deity = site.deity || "shiva";
+    const named = (Catalog && Catalog.TEMPLE_NAMES && Catalog.TEMPLE_NAMES[deity]) || site.name;
+    return {
+      id: deity + "-" + site.x + "-" + site.y,
+      name: site.name || named,
+      deity,
+      x: site.x,
+      y: site.y,
+      tx: site.x - 1,
+      ty: site.y - 3,
+      w: 3,
+      h: 3
+    };
   }
 
   function plantVillageGrove(world, village, trees) {
@@ -276,14 +323,18 @@
   }
 
   function addHatenoRiver(world) {
-    const y0 = 532;
-    for (let x = 420; x <= 590; x++) {
+    const size = world.size;
+    const y0 = Math.round(size * 0.532);
+    const x0 = Math.round(size * 0.42);
+    const x1 = Math.round(size * 0.59);
+    const mid = Math.round(size * 0.5);
+    for (let x = x0; x <= x1; x++) {
       for (let w = -2; w <= 2; w++) {
         const y = y0 + w;
-        if (!inBounds(x, y, world.size)) continue;
+        if (!inBounds(x, y, size)) continue;
         const t = getTile(world, x, y);
         if (t === TILE.FLOOR || t === TILE.WALL) continue;
-        const onRoad = t === TILE.PATH || t === TILE.BRIDGE || Math.abs(x - 500) <= 2;
+        const onRoad = t === TILE.PATH || t === TILE.BRIDGE || Math.abs(x - mid) <= 2;
         if (onRoad) setTile(world, x, y, TILE.BRIDGE);
         else if (Math.abs(w) === 2) {
           if (t === TILE.GRASS || t === TILE.FLOWER) setTile(world, x, y, TILE.SAND);
@@ -292,7 +343,7 @@
         }
       }
     }
-    carvePath(world, 500, 500, 500, 555);
+    carvePath(world, mid, mid, mid, Math.round(size * 0.555));
   }
 
   function scatterRocksAndFlowers(world, rng) {
@@ -301,7 +352,7 @@
       const y = 6 + ((rng() * (world.size - 12)) | 0);
       if (getTile(world, x, y) !== TILE.GRASS) continue;
       if (world.blocked.has(x + "," + y)) continue;
-      if (nearVillage(x, y, 14)) continue;
+      if (nearVillage(x, y, 14, world)) continue;
       setTile(world, x, y, TILE.WALL);
     }
     for (let i = 0; i < 2200; i++) {
@@ -335,7 +386,7 @@
         }
       }
     }
-    return { x: 500, y: 500 };
+    return { x: (world.spawn && world.spawn.x) || (world.size >> 1), y: (world.spawn && world.spawn.y) || (world.size >> 1) };
   }
 
   function spawnForSlot(world, slot) {
@@ -365,14 +416,15 @@
     seed = (seed == null ? DEFAULT_SEED : seed) >>> 0;
     size = size || SIZE;
     const rng = mulberry32(seed);
+    const laid = villagesFor(size);
     const world = {
       seed,
       size,
       tiles: new Uint8Array(size * size),
       trees: [],
       houses: [],
-      villages: VILLAGES.map((v) => ({ name: v.name, x: v.x, y: v.y })),
-      spawn: { x: 500, y: 500 },
+      villages: laid.map((v) => ({ name: v.name, x: v.x, y: v.y })),
+      spawn: { x: laid[0].x, y: laid[0].y },
       blocked: new Set(),
       stats: null
     };
@@ -380,9 +432,29 @@
     world.tiles.fill(TILE.GRASS);
     borderWall(world);
 
-    carveRiver(world, rng, 180, 8, Math.PI * 0.55, size + 80, 2);
-    carveRiver(world, rng, 8, 420, 0.12, size + 40, 2);
-    carveRiver(world, rng, 640, 8, Math.PI * 0.72, size, 1);
+    const temples = laid.map(makeTemple);
+    const margin = u(size, 90);
+    const gap = u(size, 140);
+    for (let e = 0; e < EXTRA_DEITIES.length; e++) {
+      for (let tries = 0; tries < 50; tries++) {
+        const span = Math.max(8, size - margin * 2);
+        const x = margin + ((rng() * span) | 0);
+        const y = margin + ((rng() * span) | 0);
+        if (nearVillage(x, y, gap, { temples })) continue;
+        temples.push(makeTemple({
+          name: EXTRA_DEITIES[e].name,
+          deity: EXTRA_DEITIES[e].deity,
+          x, y
+        }));
+        break;
+      }
+    }
+    world.temples = temples;
+    world.villages = temples.map((t) => ({ name: t.name, x: t.x, y: t.y, deity: t.deity }));
+
+    carveRiver(world, rng, u(size, 180), u(size, 8), Math.PI * 0.55, Math.round(size * 1.2), 1);
+    carveRiver(world, rng, u(size, 8), Math.min(size - 8, u(size, 420)), 0.12, Math.round(size * 1.2), 1);
+    carveRiver(world, rng, Math.min(size - 8, u(size, 640)), u(size, 8), Math.PI * 0.72, size, 1);
 
     for (let i = 0; i < world.villages.length; i++) {
       const houses = placeVillage(world, world.villages[i], rng);
@@ -422,7 +494,8 @@
       paths: counts.path,
       trees: world.trees.length,
       houses: world.houses.length,
-      villages: world.villages.length
+      villages: world.villages.length,
+      temples: (world.temples || []).length
     };
     return world;
   }
@@ -433,6 +506,9 @@
       size: world.size,
       spawn: world.spawn,
       villages: world.villages,
+      temples: (world.temples || []).map((t) => ({
+        id: t.id, name: t.name, deity: t.deity, x: t.x, y: t.y, tx: t.tx, ty: t.ty, w: t.w, h: t.h
+      })),
       stats: world.stats
     };
   }
@@ -441,8 +517,10 @@
     SIZE,
     DEFAULT_SEED,
     TILE,
-    VILLAGES,
+    VILLAGES: villagesFor(SIZE),
+    villagesFor,
     SPAWN_OFFSETS,
+    makeTemple,
     generateWorld,
     getTile,
     setTile,
